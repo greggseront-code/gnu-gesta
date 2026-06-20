@@ -1,353 +1,160 @@
-# Gestion Des Stages V1 Design
+# Gestion des stages V1 - Spec fonctionnelle
 
 ## Objectif
 
-Construire une application web unique de gestion des stages pour trois publics
-distincts: equipe pedagogique, etudiants et entreprises. Cette V1 couvre le
-depot d'offres, leur validation pedagogique, leur publication aux etudiants et
-le depot de candidatures, sans traiter encore le workflow complet apres
-candidature.
+Construire une application web de gestion des stages pour l'equipe
+pedagogique, les etudiants et les entreprises.
+
+La V1 couvre le depot d'offres, leur validation pedagogique, leur publication
+aux etudiants et le depot de candidatures. Le workflow complet apres
+candidature reste hors perimetre.
 
 ## Perimetre V1
 
-La V1 couvre:
+Inclus:
 
-- l'import initial des etudiants par CSV
-- la gestion d'un referentiel d'entreprises et de contacts entreprise
-- le depot d'offres par les entreprises
-- le depot de propositions de stage par les etudiants
-- la validation des offres et propositions par l'equipe pedagogique
-- la publication des offres validees aux etudiants
-- la consultation du referentiel d'entreprises par les etudiants, meme sans
-  offre publiee
-- la postulation des etudiants sur les offres publiees
-- la validation par l'entreprise d'un etudiant ayant postule
-- le marquage final d'une offre comme prise ou non disponible
+- import initial des etudiants par CSV ou donnees equivalentes;
+- gestion d'un referentiel d'entreprises et de contacts entreprise;
+- depot d'offres par les entreprises;
+- depot de propositions de stage par les etudiants;
+- validation ou refus des offres et propositions par l'equipe pedagogique;
+- publication des offres validees aux etudiants;
+- consultation du referentiel d'entreprises par les etudiants, meme sans offre
+  publiee;
+- candidature des etudiants sur les offres publiees;
+- selection par l'entreprise d'un etudiant ayant postule;
+- marquage final d'une offre comme prise ou non disponible.
 
-La V1 ne couvre pas:
+Exclus:
 
-- le SSO Microsoft
-- la gestion avancee des candidatures apres depot
-- les conventions et signatures
-- les documents administratifs aval
-- les workflows d'evaluation pedagogique
+- SSO Microsoft;
+- conventions et signatures;
+- documents administratifs aval;
+- workflow complet d'evaluation pedagogique;
+- gestion avancee des candidatures apres depot.
 
-## Approche Produit
+## Parcours attendus
 
-L'application prend la forme d'un portail unique multi-roles. Chaque utilisateur
-se connecte a la meme application, puis accede a un espace adapte a son role.
-Ce choix evite de dupliquer les interfaces et permet de partager un meme modele
-de donnees et une meme logique de validation.
+### Equipe pedagogique
 
-Les roles V1 sont:
+Un `gestionnaire` peut importer les etudiants, consulter toutes les donnees,
+creer ou corriger les entreprises et contacts, valider ou refuser une offre, et
+cloturer une offre comme prise ou non disponible.
 
-- `gestionnaire`
-- `lecteur`
-- `etudiant`
-- `entreprise`
-
-## Architecture Fonctionnelle
-
-### Espace pedagogique
-
-L'espace pedagogique dispose de deux niveaux de droits:
-
-- `gestionnaire`: peut importer les etudiants, consulter toutes les donnees,
-  creer et corriger entreprises et contacts, valider ou refuser une offre,
-  publier indirectement une offre en la validant, et cloturer une offre comme
-  prise ou non disponible
-- `lecteur`: peut consulter toutes les donnees sans modifier
+Un `lecteur` peut consulter les donnees sans les modifier.
 
 L'espace pedagogique doit permettre:
 
-- la vue des offres a traiter, avec indication de l'origine de chaque offre (deposee par une entreprise ou proposee par un etudiant)
-- la consultation globale des entreprises, contacts, offres et candidatures
-- la correction des donnees de reference
-- la supervision de la publication des offres
-
-### Espace etudiant
-
-L'etudiant peut:
-
-- consulter les offres validees et visibles
-- consulter les entreprises, y compris celles sans offre publiee
-- filtrer et rechercher les offres publiees
-- postuler a une offre publiee par une entreprise
-- deposer sa propre proposition de stage
-
-La proposition etudiante utilise le meme formulaire detaille qu'une offre
-deposee par une entreprise. Si l'entreprise existe deja, l'etudiant doit la
-retrouver et la reutiliser. Sinon, il peut suggerer sa creation.
-
-### Espace entreprise
-
-L'entreprise dispose d'un mini-espace avec:
-
-- son profil entreprise
-- sa liste de contacts
-- sa liste d'offres
-- le statut de chaque offre
-- les etudiants ayant postule a ses offres
-- la creation et la modification d'offres
-
-La V1 doit permettre a une meme entreprise de gerer plusieurs offres.
-
-## Objets Metier
+- voir les offres a traiter avec leur origine;
+- consulter entreprises, contacts, offres et candidatures;
+- corriger les donnees de reference;
+- superviser la publication des offres.
 
 ### Etudiant
 
-Un etudiant est importe par CSV dans la V1. Il possede les informations minimales
-necessaires a l'usage de l'application et a la candidature. Le detail exact des
-colonnes CSV sera defini au plan d'implementation, mais l'import doit etre
-pense comme le mode principal d'initialisation du referentiel.
+Un etudiant peut:
+
+- consulter les offres validees et visibles;
+- consulter les entreprises, y compris sans offre publiee;
+- filtrer et rechercher les offres publiees;
+- postuler a une offre publiee par une entreprise;
+- deposer sa propre proposition de stage.
+
+La proposition etudiante utilise le meme niveau d'information qu'une offre
+deposee par une entreprise. Si l'entreprise existe deja, l'etudiant doit la
+retrouver et la reutiliser. Sinon, il peut suggerer sa creation.
 
 ### Entreprise
 
-Une entreprise contient au minimum:
+Une entreprise peut:
 
-- nom
-- adresse
-- email general
+- consulter et completer son profil;
+- gerer ses contacts;
+- creer et modifier ses offres;
+- suivre le statut de ses offres;
+- consulter les etudiants ayant postule a ses offres;
+- retenir un etudiant sur une offre publiee.
 
-Une entreprise peut etre:
+Une meme entreprise peut gerer plusieurs offres.
 
-- deja presente dans le referentiel
-- creee par l'equipe pedagogique
-- suggeree par un etudiant lors du depot d'une proposition
-- creee ou completee par l'entreprise elle-meme dans son espace
+## Objets fonctionnels
+
+### Etudiant
+
+Un etudiant est importe dans le referentiel. Les informations minimales doivent
+permettre l'identification, la consultation et la candidature.
+
+### Entreprise
+
+Une entreprise contient au minimum un nom, une adresse et un email general.
+Elle peut etre creee par l'equipe pedagogique, suggeree par un etudiant ou
+completee par l'entreprise elle-meme.
 
 ### Contact entreprise
 
-Un contact entreprise est rattache a une entreprise. Il contient:
-
-- nom
-- prenom
-- email
-- telephone optionnel
-- roles
-
-Les roles possibles sont:
-
-- maitre de stage
-- responsable administratif
-- encadrant technique
-
-Un contact peut porter un ou plusieurs roles.
-
-Chaque entreprise doit disposer d'au moins un contact cree, en plus de son
-email general, afin de rester exploitable meme si un contact quitte
-l'entreprise.
+Un contact est rattache a une entreprise. Il contient nom, prenom, email,
+telephone optionnel et roles. Chaque entreprise doit disposer d'au moins un
+contact exploitable en plus de son email general.
 
 ### Offre de stage
 
-Une offre contient:
+Une offre contient l'entreprise rattachee, les contacts, une description, le
+lieu de stage, les technologies, les objectifs, le teletravail, les remarques
+optionnelles et une piece jointe optionnelle.
 
-- entreprise rattachee
-- contacts rattaches
-- description
-- description du lieu de stage
-- technologies utilisees
-- objectifs du projet
-- teletravail oui/non
-- pourcentage de teletravail
-- remarques optionnelles
-- piece jointe optionnelle
-
-Chaque offre doit etre rattachee a au moins un contact de l'entreprise
-concernee. Parmi ces contacts, l'un doit etre identifie comme contact
-prioritaire pour la candidature a l'offre.
-
-L'offre est l'objet central de la V1, quel que soit son mode d'entree.
+Chaque offre doit etre rattachee a au moins un contact, dont un contact
+prioritaire pour la candidature.
 
 ### Candidature
 
-Une candidature relie un etudiant a une offre d'entreprise visible. En V1, son
-role est d'enregistrer qu'un etudiant a postule. L'entreprise peut ensuite
-retenir l'un des etudiants ayant postule. Le traitement detaille aval de la
-candidature reste hors perimetre.
+Une candidature relie un etudiant a une offre visible. En V1, elle enregistre
+qu'un etudiant a postule. L'entreprise peut ensuite retenir un candidat.
 
-## Modes D'Entree Des Offres
+## Statuts fonctionnels
 
-### Offre creee par une entreprise
+Statuts minimaux attendus:
 
-Le parcours est:
+- `soumise`: l'offre attend validation pedagogique;
+- `validee_et_visible`: l'offre est approuvee et visible aux etudiants;
+- `prise`: l'offre a ete attribuee a un etudiant;
+- `non_disponible`: l'offre n'est plus ouverte.
 
-1. l'entreprise se connecte a son mini-espace
-2. elle cree une offre
-3. elle la soumet
-4. l'equipe pedagogique la relit et la valide ou non
-5. si elle est validee, elle devient visible aux etudiants
-6. l'entreprise peut ensuite retenir un etudiant ayant postule, ce qui fait
-   passer l'offre a l'etat `prise`
+Le code actuel contient aussi `refusee`; ce statut doit etre confirme dans une
+spec dediee si le refus devient un comportement produit stable.
 
-### Proposition deposee par un etudiant
+## Regles metier
 
-Le parcours est:
+- Seuls les `gestionnaires` peuvent modifier les statuts.
+- Seuls les `gestionnaires` peuvent corriger les entreprises et contacts hors
+  donnees propres a une entreprise.
+- Les `lecteurs` ont un acces en lecture seule.
+- Les `etudiants` ne voient que les offres validees et visibles, leurs propres
+  propositions, les offres auxquelles ils ont postule tant qu'elles ne sont pas
+  `non_disponible`, et le referentiel d'entreprises.
+- Les `entreprises` ne voient que leurs propres donnees.
+- Une offre non validee n'est visible que par son auteur et l'equipe
+  pedagogique.
+- Une offre validee devient visible aux etudiants.
+- Une offre prise n'est plus disponible pour une nouvelle attribution.
+- Une offre non disponible n'est plus ouverte aux candidatures.
+- Un etudiant ne doit pas pouvoir postuler deux fois a la meme offre.
 
-1. l'etudiant remplit le meme formulaire detaille qu'une entreprise
-2. il rattache sa proposition a une entreprise existante si possible
-3. si l'entreprise n'existe pas, il suggere sa creation
-4. l'equipe pedagogique relit la proposition et la valide ou non
-5. si la proposition est validee, elle est consideree administrativement comme
-   acceptable
+## Doublons entreprise
 
-La V1 ne demande pas a l'etudiant de gerer un workflow complet avec l'entreprise
-apres cette validation.
+La V1 doit limiter les doublons d'entreprises:
 
-## Statuts
+- recherche obligatoire avant creation;
+- affichage de correspondances probables;
+- correction possible par l'equipe pedagogique pour les propositions deposees
+  par un etudiant.
 
-Les statuts minimaux des offres en V1 sont:
+La fusion avancee de doublons est hors perimetre V1.
 
-- `soumise`
-- `validee_et_visible`
-- `prise`
-- `non_disponible`
+## Criteres d'acceptation
 
-Interpretation:
-
-- `soumise`: l'offre a ete deposee et attend validation pedagogique
-- `validee_et_visible`: l'offre est approuvee et visible aux etudiants
-- `prise`: l'offre a finalement ete attribuee a un etudiant et ne doit plus
-  servir de support a de nouvelles attributions
-- `non_disponible`: l'offre n'est plus ouverte, par exemple parce qu'elle a ete
-  attribuee a un stagiaire d'une autre ecole
-
-Pour rester simple, la V1 ne distingue pas un workflow de statuts different
-selon que l'offre vient d'une entreprise ou d'un etudiant.
-
-## Regles Metier
-
-### Droits
-
-- seuls les `gestionnaires` peuvent modifier les statuts
-- seuls les `gestionnaires` peuvent corriger les entreprises et contacts
-- les `lecteurs` ont un acces en lecture seule
-- les `etudiants` ne voient que les offres validees et visibles, plus leurs
-  propres propositions, plus les offres auxquelles ils ont postule (y compris
-  si l'offre est passee a l'etat `prise`), a l'exclusion des offres
-  `non_disponible`, ainsi que le referentiel d'entreprises
-- les `entreprises` ne voient que leurs propres donnees
-
-### Publication
-
-- une offre non validee n'est visible que par son auteur et l'equipe
-  pedagogique
-- une offre validee devient visible aux etudiants
-- une offre prise n'est plus disponible pour une nouvelle attribution
-- une offre non disponible n'est plus ouverte aux candidatures
-
-### Decision de l'entreprise sur les candidatures
-
-Sur une offre publiee, l'entreprise peut consulter les etudiants ayant postule
-et en retenir un. Ce choix conduit a l'etat `prise`.
-
-Le gestionnaire doit pouvoir cloturer une offre qui n'est plus disponible sans
-avoir ete attribuee a l'un de nos etudiants. Dans ce cas, il place l'offre dans
-l'etat `non_disponible`.
-
-### Doublons entreprise
-
-Le risque de doublon entreprise est frequent, en particulier lors d'une
-proposition deposee par un etudiant. La V1 doit donc imposer les garde-fous
-suivants:
-
-- recherche obligatoire avant creation d'une entreprise
-- affichage de correspondances probables lorsque le nom saisi ressemble a une
-  entreprise existante
-- capacite pour l'equipe pedagogique de corriger la reference entreprise choisie, uniquement pour les propositions deposees par un etudiant
-
-La fusion avancee de doublons peut etre reportee a un plan technique minimal si
-necessaire, mais la prevention des doublons doit etre presente des la V1.
-
-### Validation des donnees
-
-La V1 doit inclure une validation de base sur:
-
-- emails
-- telephones
-- champs obligatoires
-- coherence entre teletravail et pourcentage de teletravail
-- presence d'au moins un contact entreprise
-- presence d'un contact prioritaire sur chaque offre
-
-## Experience Utilisateur
-
-### Tableau de bord gestionnaire
-
-Le gestionnaire doit retrouver rapidement:
-
-- les offres soumises en attente
-- les entreprises nouvellement creees ou suspectes de doublon
-- les offres a cloturer comme non disponibles si necessaire
-- l'import CSV des etudiants
-- la recherche globale
-
-### Tableau de bord lecteur
-
-Le lecteur accede a des vues de consultation sur:
-
-- offres
-- entreprises
-- contacts
-- candidatures
-
-### Tableau de bord etudiant
-
-L'etudiant voit:
-
-- une liste d'offres validees
-- un acces au referentiel d'entreprises, meme sans offre publiee
-- des filtres simples
-- un acces a la candidature
-- un acces au depot de proposition
-
-### Tableau de bord entreprise
-
-L'entreprise voit:
-
-- son profil
-- ses contacts
-- ses offres
-- le statut de ses offres
-- les candidatures recues sur ses offres
-
-## Trajectoire V2 Compatible
-
-Le design V1 doit rester compatible avec:
-
-- un futur SSO Microsoft pour les etudiants
-- un workflow de candidatures plus detaille
-- l'ajout de conventions et documents administratifs
-- un enrichissement futur des statuts
-
-Cette compatibilite ne doit pas pousser a surconcevoir la V1. Le but est de
-poser des objets et des roles stables, pas d'anticiper toute la V2.
-
-## Decisions Retenues
-
-- une seule application web multi-roles
-- un espace pedagogique a deux niveaux de droits: gestionnaire et lecteur
-- un mini-espace entreprise avec plusieurs offres et suivi des statuts
-- un espace etudiant pour consulter, proposer et postuler
-- la consultation des entreprises par les etudiants, meme sans offre
-- import CSV comme mode initial de chargement des etudiants
-- meme formulaire detaille pour les offres entreprise et les propositions
-  initiees par les etudiants
-- prevention des doublons entreprise des la V1
-- email general obligatoire sur l'entreprise
-- au moins un contact entreprise obligatoire
-- un contact prioritaire obligatoire sur chaque offre
-- possibilite pour l'entreprise de retenir un candidat
-- possibilite pour le gestionnaire de cloturer une offre comme non disponible
-- workflow V1 volontairement court, sans traitement aval complet
-
-## Questions Reportees A La Phase De Plan
-
-Ces sujets ne bloquent pas le design fonctionnel mais devront etre arbitres dans
-le plan technique:
-
-- mode exact d'authentification V1 pour les entreprises
-- niveau de detail du schema CSV d'import etudiant
-- format, taille et stockage des pieces jointes
-- regles exactes de recherche approximative des entreprises
-- detail des champs obligatoires pour chaque formulaire
+- Les offres soumises ne sont pas visibles publiquement aux etudiants.
+- Une offre validee devient visible et accepte les candidatures.
+- Une offre `prise` ou `non_disponible` ne permet plus de nouvelle attribution.
+- Une entreprise ne peut consulter que les candidatures de ses offres.
+- Un lecteur ne peut pas modifier les donnees.
+- Un gestionnaire peut corriger les donnees de reference et les statuts.
