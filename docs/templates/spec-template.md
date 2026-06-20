@@ -42,8 +42,8 @@ Règles spécifiques à ce changement.
 
 Features impactées :
 
-* Backend : `backend/features/...`
-* Frontend : `frontend/features/...`
+* Backend : `backend/src/features/...`
+* Frontend : `frontend/src/features/...` ou `frontend/src/pages/...`
 
 Données impactées :
 

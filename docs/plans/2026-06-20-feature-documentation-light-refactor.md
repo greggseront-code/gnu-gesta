@@ -198,7 +198,7 @@ Cocher chaque item une fois termine.
 ### 8. Verification finale
 
 * [ ] Verifier avec `git status --short` que seuls des fichiers de documentation ont ete modifies ou crees.
-* [ ] Verifier l'absence de marqueurs parasites (`TODO`, `FIXME`, `*** End Patch`) dans les fichiers modifies.
+* [ ] Verifier l'absence de marqueurs parasites de travail ou de patch dans les fichiers modifies.
 * [ ] Verifier que les chemins documentes utilisent la structure reelle :
   * [ ] `backend/src/features/`
   * [ ] `frontend/src/features/`
