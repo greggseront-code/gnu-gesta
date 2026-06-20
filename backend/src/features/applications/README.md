@@ -1,98 +1,65 @@
-# Applications
+# Applications - Backend
 
-## Rôle
+## Endpoints
 
-Gérer les candidatures des étudiants sur les offres et la sélection d'un
-candidat par une entreprise.
+* `POST /api/offers/:offerId/applications` : crée une candidature pour
+  l'étudiant courant.
+* `GET /api/offers/:offerId/applications` : liste les candidatures d'une offre.
+* `POST /api/offers/:offerId/select-candidate` : sélectionne une candidature et
+  passe l'offre à `prise`.
 
-## Responsabilités principales
+La route `GET /api/students/:studentId/applications` est exposée par la feature
+`students`, mais utilise le service `applications`.
 
-* Créer une candidature pour une offre visible.
-* Lister les candidatures d'une offre.
-* Lister les candidatures d'un étudiant.
-* Empêcher les candidatures dupliquées.
-* Sélectionner une candidature pour une offre.
-* Passer l'offre à `prise` lors de la sélection.
+## Modèle de domaine
 
-## Règles métier locales
+Une candidature relie un étudiant à une offre.
 
-Règles portées principalement par cette feature.
+Champs principaux :
 
-* Seul un `etudiant` peut créer une candidature.
-* Une candidature n'est acceptée que si l'offre est `validee_et_visible`.
-* Une entreprise ne peut consulter ou sélectionner que sur ses propres offres.
-* Une candidature doit appartenir à l'offre cible avant sélection.
-* Une offre déjà `prise` ne peut pas recevoir une nouvelle sélection.
-* Le couple offre/étudiant est unique.
-
-## États ou statuts
+* `offer_id`
+* `student_id`
+* `selected`
+* `created_at`
 
 Cette feature ne possède pas de statut propre. Elle modifie le statut d'offre
 vers `prise` lors de la sélection d'un candidat.
 
-* `prise` : statut appliqué à l'offre après sélection.
+## Règles métier
 
-## Interfaces exposées
+* Une candidature n'est acceptée que pour une offre `validee_et_visible`.
+* Le couple offre/étudiant est unique.
+* Une entreprise ne peut consulter ou sélectionner que les candidatures de ses
+  propres offres.
+* La candidature sélectionnée doit appartenir à l'offre ciblée.
+* Une offre déjà `prise` ne peut pas recevoir une nouvelle sélection.
+* La sélection est transactionnelle : candidature sélectionnée, historique de
+  statut et offre mise à jour.
 
-API backend :
+## Accès données
 
-* `POST /api/offers/:offerId/applications` : créer une candidature.
-* `GET /api/offers/:offerId/applications` : lister les candidatures d'une offre.
-* `POST /api/offers/:offerId/select-candidate` : sélectionner une candidature.
-* `GET /api/students/:studentId/applications` : route exposée par `students`,
-  mais alimentée par cette feature.
+Tables utilisées :
 
-Écrans ou routes frontend :
+* `applications` : création, liste et sélection des candidatures.
+* `offers` : vérification de l'offre et passage à `prise`.
+* `offer_status_history` : historique du changement de statut.
 
-* `/student/applications` : candidatures et propositions de l'étudiant.
-* `/admin/applications` : vue pédagogique des candidatures.
-* `/company/dashboard` : consultation et sélection des candidatures reçues.
+Points d'attention :
 
-Composants ou fonctions réutilisables :
+* La contrainte SQL unique sur `(offer_id, student_id)` empêche les doublons.
+* La sélection vérifie l'appartenance de la candidature à l'offre avant mise à
+  jour.
 
-* `frontend/src/features/applications/applications.api.ts`
+Voir aussi : `docs/data-model.md`.
 
-## Dépendances
-
-Features liées :
-
-* `offers` : vérification de l'offre, de son statut et de son entreprise
-  propriétaire.
-* `students` : consultation des candidatures d'un étudiant.
-
-Services externes :
-
-* Aucun identifié.
-
-Librairies ou modules partagés :
-
-* `authorization.middleware.ts`
-* Tables `applications`, `offers` et `offer_status_history`.
-
-## Fichiers principaux
-
-* `applications.routes.ts` : routes de candidature et de sélection.
-* `applications.service.ts` : façade métier vers les requêtes SQL.
-* `applications.queries.ts` : insertion, consultation et sélection
-  transactionnelle.
-* `applications.schemas.ts` : validation du payload de sélection.
-* `applications.types.ts` : type `Application`.
-
-## Validations et permissions
-
-Validations :
-
-* `SelectCandidateSchema` exige un `application_id` entier positif.
-* La création s'appuie sur `req.auth.entityId` comme identifiant étudiant.
-* La contrainte unique SQL évite les doublons offre/étudiant.
-
-Permissions ou rôles :
+## Permissions
 
 * `etudiant` : création d'une candidature.
-* `gestionnaire`, `lecteur`, `entreprise` : lecture des candidatures d'une offre.
-* `entreprise` : sélection d'une candidature sur ses propres offres.
+* `gestionnaire`, `lecteur`, `entreprise` : lecture des candidatures d'une
+  offre.
+* `entreprise` : sélection d'un candidat sur ses propres offres.
 
-## Tests de référence
+## Tests back
 
 Fichiers de tests :
 
@@ -107,15 +74,7 @@ Scénarios importants :
 * Blocage IDOR lors de la sélection d'une candidature d'une autre offre.
 * Passage à `prise` et rejet d'une double sélection.
 
-## Limites connues
-
-* Les réponses ne joignent pas les détails enrichis de l'étudiant candidat.
-* La sélection historise le changement de statut, mais le champ `changed_by`
-  n'est pas renseigné.
-
 ## Documents liés
 
-* Specs : `docs/specs/2026-05-15-gestion-stages-v1-design.md`,
-  `docs/specs/2026-05-15-gestion-stages-v1-technical-design.md`
-* Reviews : `docs/reviews/2026-06-18-documentation-restructure.md`,
-  `docs/reviews/2026-06-18-architecture-bird-eye-refactor.md`
+* Carte des features : `docs/features.md`
+* Modèle de données : `docs/data-model.md`

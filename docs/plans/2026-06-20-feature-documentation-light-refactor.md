@@ -149,35 +149,35 @@ Cocher chaque item une fois termine.
 
 ### 4. Modele de donnees
 
-* [ ] Creer `docs/data-model.md`.
-* [ ] Documenter le choix SQLite et SQL explicite.
-* [ ] Documenter les fichiers backend DB :
-  * [ ] `backend/src/db/schema.sql`
-  * [ ] `backend/src/db/db.connection.ts`
-  * [ ] `backend/src/db/db.migrate.ts`
-* [ ] Documenter les tables principales et leurs relations.
-* [ ] Documenter quelles features backend utilisent quelles tables.
-* [ ] Documenter les conventions SQL.
-* [ ] Documenter les limites connues et questions ouvertes sur la DB.
+* [x] Creer `docs/data-model.md`.
+* [x] Documenter le choix SQLite et SQL explicite.
+* [x] Documenter les fichiers backend DB :
+  * [x] `backend/src/db/schema.sql`
+  * [x] `backend/src/db/db.connection.ts`
+  * [x] `backend/src/db/db.migrate.ts`
+* [x] Documenter les tables principales et leurs relations.
+* [x] Documenter quelles features backend utilisent quelles tables.
+* [x] Documenter les conventions SQL.
+* [x] Documenter les limites connues et questions ouvertes sur la DB.
 
 ### 5. README backend
 
-* [ ] Refactoriser `backend/src/features/applications/README.md`.
-* [ ] Refactoriser `backend/src/features/companies/README.md`.
-* [ ] Refactoriser `backend/src/features/offers/README.md`.
-* [ ] Refactoriser `backend/src/features/students/README.md`.
-* [ ] Verifier que chaque README backend contient :
-  * [ ] `Endpoints`
-  * [ ] `Modele de domaine`
-  * [ ] `Regles metier`
-  * [ ] `Acces donnees`
-  * [ ] `Permissions`
-  * [ ] `Tests back`
-  * [ ] `Documents lies`
-* [ ] Ajouter un lien vers `docs/features.md`.
-* [ ] Ajouter un lien vers `docs/data-model.md`.
-* [ ] Verifier qu'aucun README backend ne liste de fichiers `.tsx`.
-* [ ] Verifier qu'aucun README backend ne documente les routes frontend.
+* [x] Refactoriser `backend/src/features/applications/README.md`.
+* [x] Refactoriser `backend/src/features/companies/README.md`.
+* [x] Refactoriser `backend/src/features/offers/README.md`.
+* [x] Refactoriser `backend/src/features/students/README.md`.
+* [x] Verifier que chaque README backend contient :
+  * [x] `Endpoints`
+  * [x] `Modele de domaine`
+  * [x] `Regles metier`
+  * [x] `Acces donnees`
+  * [x] `Permissions`
+  * [x] `Tests back`
+  * [x] `Documents lies`
+* [x] Ajouter un lien vers `docs/features.md`.
+* [x] Ajouter un lien vers `docs/data-model.md`.
+* [x] Verifier qu'aucun README backend ne liste de fichiers `.tsx`.
+* [x] Verifier qu'aucun README backend ne documente les routes frontend.
 
 ### 6. Architecture
 
