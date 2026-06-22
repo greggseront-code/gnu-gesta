@@ -14,9 +14,10 @@ import { getOfferById } from '../offers/offers.service';
 // Mounted at /api/offers/:offerId/applications — mergeParams so :offerId is visible
 export const applicationsRouter = Router({ mergeParams: true });
 
-// POST / — etudiant only; req.auth.entityId is the student_id
 applicationsRouter.post('/', requireRole('etudiant'), (req, res) => {
   const offerId = Number(req.params.offerId);
+  // The student id is intentionally taken from auth context, not from request
+  // body, to prevent applying on behalf of another student.
   const studentId = req.auth.entityId;
 
   if (!studentId) {
@@ -24,7 +25,8 @@ applicationsRouter.post('/', requireRole('etudiant'), (req, res) => {
     return;
   }
 
-  // Issue 2 — Only allow applications to visible offers
+  // Applications are only valid while an offer is published to students; this is
+  // stricter than read visibility for previous applicants.
   const offer = getOfferById(offerId);
   if (!offer) {
     res.status(404).json({ error: 'Offre non trouvée' });

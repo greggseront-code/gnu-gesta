@@ -16,6 +16,8 @@ export const ROLE_STORAGE_KEY = 'gesta_role';
 
 function loadFromStorage(): RoleState {
   try {
+    // V1 role selection is a local UX shortcut, mirrored to backend headers by
+    // api-client.ts. It is not a security boundary.
     const raw = localStorage.getItem(ROLE_STORAGE_KEY);
     if (!raw) return { role: null, entityId: null };
     return JSON.parse(raw) as RoleState;

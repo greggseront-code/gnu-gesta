@@ -44,6 +44,8 @@ export function CompanyDashboardPage() {
   const [contactFormSuccess, setContactFormSuccess] = useState(false);
 
   async function loadApplications(fetchedOffers: Offer[]) {
+    // The company dashboard only needs candidates for offers that can still
+    // influence selection history: published offers and offers already taken.
     const relevant = fetchedOffers.filter(
       (o) => o.status === 'validee_et_visible' || o.status === 'prise',
     );

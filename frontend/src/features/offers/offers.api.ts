@@ -73,6 +73,8 @@ export async function uploadOfferAttachment(offerId: number, file: File): Promis
   const formData = new FormData();
   formData.append('file', file);
 
+  // Do not use apiFetch here: FormData must let the browser set the multipart
+  // boundary, while the V1 auth headers still need to be forwarded manually.
   const res = await fetch(`/api/offers/${offerId}/attachment`, {
     method: 'POST',
     headers: authHeaders,

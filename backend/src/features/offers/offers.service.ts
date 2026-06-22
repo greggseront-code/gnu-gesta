@@ -21,6 +21,9 @@ export function createOffer(input: OfferInput, auth: AuthContext): Offer {
   const db = getDb();
   const offer = insertOffer(db, {
     ...input,
+    // These attribution fields drive visibility: student proposals remain
+    // visible to their author, and company-created offers stay visible to the
+    // owning company even when a gestionnaire submits them on its behalf.
     submitted_by_student_id: auth.role === 'etudiant' ? auth.entityId : null,
     created_by_company_id:
       auth.role === 'entreprise' ? auth.entityId : auth.role === 'gestionnaire' ? input.company_id : null,

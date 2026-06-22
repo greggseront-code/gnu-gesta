@@ -27,6 +27,8 @@ function addColumnIfMissing(db: Database, table: string, column: string, definit
 }
 
 function applyColumnMigrations(db: Database): void {
+  // Migration strategy is deliberately minimal for SQLite V1: schema.sql creates
+  // fresh databases, and only additive column migrations are applied in place.
   addColumnIfMissing(db, 'offers', 'created_by_company_id', 'INTEGER REFERENCES companies(id)');
   addColumnIfMissing(db, 'offers', 'source_type', "TEXT CHECK(source_type IN ('company', 'student'))");
 }

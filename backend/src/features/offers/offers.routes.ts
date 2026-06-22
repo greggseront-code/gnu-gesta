@@ -52,7 +52,8 @@ offersRouter.get('/:id', (req, res) => {
   const offer = getOfferById(Number(req.params.id));
   if (!offer) { res.status(404).json({ error: 'Offre non trouvée' }); return; }
   if (!isVisible(offer, req.auth)) {
-    // Etudiant who applied can still see the offer, unless it's non_disponible
+    // Keep this exception aligned with listOffers(): an etudiant who already
+    // applied can reopen the offer detail unless it became non_disponible.
     const { role, entityId } = req.auth;
     if (role === 'etudiant' && entityId != null && offer.status !== 'non_disponible') {
       const app = getApplicationByStudentAndOffer(offer.id, entityId);

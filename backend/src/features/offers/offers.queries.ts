@@ -64,6 +64,9 @@ export function listOffers(db: Database, auth: AuthContext, search?: string): Of
     const joinSearchClause = search
       ? `AND (LOWER(o.description) LIKE @search OR LOWER(o.technologies) LIKE @search OR LOWER(o.location) LIKE @search)`
       : '';
+    // Student visibility is broader than public visibility: they keep access to
+    // their own proposals and to offers they applied to, except when an offer is
+    // explicitly marked non_disponible.
     return db
       .prepare(
         `SELECT DISTINCT o.* FROM offers o
@@ -99,6 +102,8 @@ export function findOfferById(db: Database, id: number): Offer | null {
 
 export function updateOfferStatus(db: Database, id: number, status: OfferStatus): Offer {
   const current = findOfferById(db, id);
+  // Status transitions are part of the pedagogical audit trail. Keep the history
+  // insert paired with every direct status update.
   db.prepare(
     `INSERT INTO offer_status_history (offer_id, from_status, to_status) VALUES (?, ?, ?)`,
   ).run(id, current?.status ?? null, status);

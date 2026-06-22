@@ -76,7 +76,8 @@ export function selectCandidateAndCloseOffer(
   offerId: number,
 ): Offer {
   const run = db.transaction(() => {
-    // Issue 1 — IDOR: verify the application belongs to this offer
+    // Security invariant: never trust the application id alone, because it is
+    // submitted inside an offer-scoped route and must belong to that offer.
     const application = db
       .prepare('SELECT offer_id FROM applications WHERE id = ?')
       .get(applicationId) as { offer_id: number } | undefined;
@@ -85,7 +86,8 @@ export function selectCandidateAndCloseOffer(
       throw new ApplicationOfferMismatchError();
     }
 
-    // Issue 3 — Idempotency: if already taken, return the current offer without side-effects
+    // Selecting a candidate closes the offer exactly once; a second selection
+    // would corrupt the selected flag/history pair.
     const current = db.prepare('SELECT * FROM offers WHERE id = ?').get(offerId) as Offer | undefined;
 
     if (current?.status === 'prise') {

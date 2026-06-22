@@ -26,6 +26,14 @@ Acteurs principaux:
 - Acces aux donnees: SQL explicite avec `better-sqlite3`.
 - Validation d'entrees: Zod.
 
+## Documents de reference
+
+- `docs/features.md`: carte produit front/back, parcours et cas limites.
+- `docs/data-model.md`: reference globale du schema SQLite et des relations.
+- `backend/src/features/*/README.md`: details backend locaux par feature.
+- `docs/specs/`: specs datees pour les changements non triviaux.
+- `docs/reviews/`: bilans datees des taches significatives.
+
 ## Principes architecturaux
 
 - Separation claire entre frontend et backend.

@@ -20,6 +20,9 @@ export function authContextMiddleware(req: Request, _res: Response, next: NextFu
   const rawRole = req.headers['x-role'];
   const rawEntityId = req.headers['x-entity-id'];
 
+  // V1 intentionally derives context from headers used by the role selector.
+  // Keep authorization checks server-side so a future auth system can replace
+  // this middleware without rewriting feature permissions.
   const role =
     typeof rawRole === 'string' && VALID_ROLES.includes(rawRole as Role)
       ? (rawRole as Role)

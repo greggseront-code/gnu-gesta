@@ -74,6 +74,8 @@ export function findCompaniesWithDuplicateRisk(db: Database): Company[] {
   const all = db.prepare('SELECT * FROM companies ORDER BY name').all() as Company[];
   const atRisk = new Set<number>();
   for (const company of all) {
+    // V1 duplicate detection is intentionally heuristic: it flags review work
+    // without blocking creation or attempting a merge.
     const keywords = company.name
       .split(/\s+/)
       .map((w) => w.replace(/[^a-zA-ZÀ-ÿ0-9]/g, ''))
