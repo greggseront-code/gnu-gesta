@@ -11,6 +11,9 @@ redéploiement après un changement de code).
 * Le site est servi sur `https://gng.seront.be`.
 * Le repo applicatif vit directement sur le VPS, dans
   `/home/ubuntu/gnu-gesta`.
+* Le développement se fait en local ; le VPS ne doit plus être édité
+  directement. Un déploiement se déclenche manuellement via les scripts du
+  dossier `deploy/` (voir "Déploiement" plus bas).
 
 ```text
 Client
@@ -41,8 +44,9 @@ indépendant des autres entrées.
 Le backend est géré par systemd plutôt que lancé manuellement, pour qu'il
 redémarre automatiquement en cas de crash ou de reboot du VPS.
 
-Fichier : `/etc/systemd/system/gnu-gesta-backend.service` (non versionné dans
-le repo, propre au VPS).
+Fichier versionné : `deploy/systemd/gnu-gesta-backend.service`. C'est la
+source de vérité ; `deploy/deploy.sh` le recopie vers
+`/etc/systemd/system/gnu-gesta-backend.service` à chaque déploiement.
 
 ```ini
 [Unit]
@@ -104,9 +108,13 @@ inchangées et continuent de protéger le reste.
 
 ## Nginx
 
-Fichier : `/etc/nginx/sites-available/gng.seront.be`, activé via un lien
-symbolique dans `/etc/nginx/sites-enabled/` (convention Debian/Ubuntu : Nginx
-ne charge que ce qui est dans `sites-enabled/`).
+Fichier versionné : `deploy/nginx/gng.seront.be.conf` — c'est la source de
+vérité, incluant les directives ajoutées par Certbot (`listen 443 ssl`,
+chemins du certificat, redirection HTTP → HTTPS). `deploy/deploy.sh` le
+recopie vers `/etc/nginx/sites-available/gng.seront.be` à chaque
+déploiement ; ce dernier est activé via un lien symbolique dans
+`/etc/nginx/sites-enabled/` (convention Debian/Ubuntu : Nginx ne charge que
+ce qui est dans `sites-enabled/`).
 
 Rôle de la config :
 
@@ -117,8 +125,10 @@ Rôle de la config :
 * `location /api/` : proxy vers `http://127.0.0.1:3000/api/`, le backend
   Express local.
 
-Certbot a ensuite modifié ce même fichier pour ajouter `listen 443 ssl`, les
-chemins vers le certificat, et la redirection HTTP → HTTPS.
+Si Certbot modifie un jour cette config à nouveau (ex: ajout d'un domaine),
+il faut reporter le changement dans `deploy/nginx/gng.seront.be.conf` pour
+que le fichier versionné reste la source de vérité — sinon le prochain
+déploiement écrasera la modification.
 
 Le site par défaut de Nginx (`/etc/nginx/sites-enabled/default`) a été
 supprimé pour éviter toute ambiguïté sur le port 80.
@@ -162,30 +172,81 @@ sudo certbot renew --dry-run
    puis `nginx -t && systemctl reload nginx`.
 4. Générer le certificat : `sudo certbot --nginx -d <sous-domaine>.seront.be --redirect`.
 
-## Redéployer après un changement de code
+## Déploiement
 
-Il n'y a pas encore de pipeline de déploiement automatisé. Pour publier un
-changement :
+Le workflow cible : développement et debug en local, push régulier sur
+`main`, puis déploiement manuel déclenché volontairement quand une version
+est prête. Le déclenchement est toujours manuel ; l'exécution, elle, tient en
+une seule commande.
 
-```bash
-cd /home/ubuntu/gnu-gesta/frontend && npm run build
-cd /home/ubuntu/gnu-gesta/backend && sudo systemctl restart gnu-gesta-backend
+Tous les fichiers de déploiement vivent dans `deploy/`, séparé du code
+applicatif (`frontend/`, `backend/`) :
+
+```text
+deploy/
+  deploy.sh                       # execute sur le VPS : fait le deploiement
+  deploy-prod.sh                  # a lancer en local : declenche deploy.sh via SSH
+  nginx/gng.seront.be.conf        # source de verite de la config Nginx
+  systemd/gnu-gesta-backend.service  # source de verite du service backend
 ```
 
-Le frontend n'a besoin que d'un rebuild (Nginx sert directement `dist/`) ; le
-backend n'a besoin que d'un redémarrage du service (pas de build requis
-puisqu'il tourne via `tsx`).
+**Depuis le poste local** (option la plus pratique — pas besoin d'ouvrir une
+session SSH à la main) :
+
+```bash
+./deploy/deploy-prod.sh
+```
+
+Ce script ne fait qu'un `ssh` vers le VPS et y lance `deploy.sh`.
+
+**Depuis une session SSH sur le VPS** (équivalent, en étant déjà connecté) :
+
+```bash
+cd /home/ubuntu/gnu-gesta && ./deploy/deploy.sh
+```
+
+`deploy.sh` effectue, dans l'ordre, et s'arrête net à la première erreur :
+
+1. Vérifie que le repo VPS est sur `main` et n'a aucune modification non
+   commitée (sinon : arrêt, pour ne jamais déployer un état incertain).
+2. `git fetch` + `git merge --ff-only origin/main`.
+3. `npm ci` dans `backend/` et `frontend/`.
+4. `npm run build` dans `frontend/` (régénère `dist/`).
+5. Recopie `deploy/nginx/gng.seront.be.conf` vers
+   `/etc/nginx/sites-available/gng.seront.be`, valide (`nginx -t`) et
+   recharge Nginx.
+6. Recopie `deploy/systemd/gnu-gesta-backend.service` vers
+   `/etc/systemd/system/`, `daemon-reload`, puis redémarre le backend.
+7. Vérifie que `https://gng.seront.be` répond en HTTP 200 ; sinon le script
+   se termine en erreur pour signaler un déploiement potentiellement cassé.
+
+Un verrou (`flock` sur `/tmp/gnu-gesta-deploy.lock`) empêche deux
+déploiements de tourner en même temps.
+
+Aucun déclenchement automatique n'existe (pas de webhook, pas de CI/CD sur
+push) : c'est un choix assumé, le déploiement doit toujours être une action
+volontaire.
 
 ## Limites connues
 
-* Pas de process de déploiement automatisé (build + restart manuels).
+* `npm ci` est relancé systématiquement à chaque déploiement (frontend et
+  backend), même sans changement de dépendances — plus simple à maintenir,
+  mais un peu plus lent qu'une vérification conditionnelle sur le lockfile.
+* Pas de rollback automatique : en cas d'échec du déploiement (build cassé,
+  vérification finale en échec), il faut corriger et redéployer, ou revenir
+  manuellement à un commit précédent sur le VPS.
 * Le comportement au reboot complet du VPS n'a pas été testé en conditions
   réelles (les services sont activés au boot via `systemctl enable`, mais
   jamais vérifiés après un reboot effectif).
-* Un seul sous-domaine est en HTTPS pour l'instant (`gng.seront.be`).
+* Un seul sous-domaine est en HTTPS pour l'instant (`gng.seront.be`) ; la
+  procédure d'ajout d'un nouveau sous-domaine reste manuelle (voir
+  "Ajouter un nouveau sous-domaine" plus haut) et n'est pas encore intégrée à
+  `deploy.sh`.
 
 ## Documents liés
 
-* Spec : `docs/specs/2026-07-30-https-reverse-proxy-gng.md`
-* Review : `docs/reviews/2026-07-30-https-reverse-proxy-gng.md`
+* Spec (mise en place HTTPS) : `docs/specs/2026-07-30-https-reverse-proxy-gng.md`
+* Review (mise en place HTTPS) : `docs/reviews/2026-07-30-https-reverse-proxy-gng.md`
+* Spec (déploiement semi-automatisé) : `docs/specs/2026-07-30-deploiement-semi-automatise.md`
+* Review (déploiement semi-automatisé) : `docs/reviews/2026-07-30-deploiement-semi-automatise.md`
 * Architecture applicative : `docs/architecture.md`
