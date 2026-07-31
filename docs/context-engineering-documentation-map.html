@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Context engineering documentaire</title>
+  <style>
+    :root {
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --ink: #1c2635;
+      --muted: #5d6a7a;
+      --line: #d8dde6;
+      --accent: #0f766e;
+      --accent-2: #ba4a00;
+      --accent-3: #4457a6;
+      --soft: #e8f4f2;
+      --soft-2: #fff2e3;
+      --soft-3: #eef1ff;
+      --shadow: 0 18px 45px rgba(24, 35, 52, 0.10);
+      --radius: 8px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(90deg, rgba(216, 221, 230, 0.45) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(216, 221, 230, 0.45) 1px, transparent 1px),
+        var(--bg);
+      background-size: 44px 44px;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .title-block {
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.55rem, 2vw, 2.25rem);
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      max-width: 760px;
+    }
+
+    .controls {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: 0 10px 28px rgba(24, 35, 52, 0.08);
+      flex: 0 0 auto;
+    }
+
+    .action {
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: #334155;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.94rem;
+      font-weight: 800;
+      padding: 9px 13px;
+      transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+      white-space: nowrap;
+    }
+
+    .action:hover,
+    .action:focus-visible {
+      background: var(--soft);
+      color: #0b5752;
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    .action.primary {
+      background: var(--accent);
+      color: #ffffff;
+      box-shadow: 0 7px 16px rgba(15, 118, 110, 0.22);
+    }
+
+    .action.primary:hover,
+    .action.primary:focus-visible {
+      background: #0b625c;
+      color: #ffffff;
+    }
+
+    .action.is-active {
+      background: #1f2937;
+      color: #ffffff;
+      box-shadow: 0 7px 16px rgba(31, 41, 55, 0.18);
+    }
+
+    .map-shell {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      overflow: hidden;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+    }
+
+    .roles-legend {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transition: max-height 260ms ease, opacity 220ms ease, margin-bottom 220ms ease;
+    }
+
+    body.roles-visible .roles-legend {
+      max-height: 180px;
+      opacity: 1;
+      margin-bottom: 18px;
+    }
+
+    .role-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.78);
+      padding: 9px;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--accent);
+      flex: 0 0 auto;
+    }
+
+    .dot.orange {
+      background: var(--accent-2);
+    }
+
+    .dot.blue {
+      background: var(--accent-3);
+    }
+
+    .flow {
+      display: grid;
+      gap: 12px;
+    }
+
+    .lane {
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr);
+      gap: 16px;
+      align-items: stretch;
+      opacity: 0;
+      transform: translateY(16px);
+      transition:
+        opacity 420ms ease,
+        transform 420ms ease;
+    }
+
+    .lane.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .lane-label {
+      border: 1px solid var(--line);
+      background: #fbfcff;
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      font-weight: 800;
+      color: #334155;
+    }
+
+    .node-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .node-row.single {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .node-row.triple {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .node {
+      position: relative;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: var(--radius);
+      min-height: 94px;
+      padding: 14px;
+      box-shadow: 0 8px 22px rgba(24, 35, 52, 0.07);
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+    }
+
+    .node::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: var(--accent);
+    }
+
+    .node.memory::before {
+      background: var(--accent-2);
+    }
+
+    .node.support::before {
+      background: var(--accent-3);
+    }
+
+    .node:hover,
+    .node:focus-visible {
+      border-color: rgba(15, 118, 110, 0.55);
+      box-shadow: 0 12px 30px rgba(24, 35, 52, 0.10);
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    .node.open {
+      border-color: rgba(15, 118, 110, 0.55);
+    }
+
+    .node-title {
+      display: block;
+      font-weight: 850;
+      font-size: 0.98rem;
+      overflow-wrap: anywhere;
+    }
+
+    .node-summary {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.93rem;
+    }
+
+    .role-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      pointer-events: none;
+      transition: max-height 260ms ease, opacity 220ms ease, margin-top 220ms ease;
+    }
+
+    body.roles-visible .role-badges {
+      max-height: 78px;
+      opacity: 1;
+      margin-top: 10px;
+      pointer-events: auto;
+    }
+
+    .role-badge {
+      border: 1px solid transparent;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 850;
+      line-height: 1.1;
+      padding: 5px 8px;
+      white-space: nowrap;
+    }
+
+    .role-badge.assisted {
+      background: #fff7ed;
+      border-color: #fed7aa;
+      color: #9a3412;
+    }
+
+    .role-badge.draft {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: #1d4ed8;
+    }
+
+    .role-badge.maintainable {
+      background: #fef9c3;
+      border-color: #fde68a;
+      color: #854d0e;
+    }
+
+    .role-badge.produced {
+      background: #ecfdf3;
+      border-color: #bbf7d0;
+      color: #166534;
+    }
+
+    .node-details {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 360ms ease;
+    }
+
+    .node.open .node-details {
+      margin-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .node-details .detail-inner {
+      padding: 12px 0 0;
+    }
+
+    .connector {
+      height: 28px;
+      display: flex;
+      justify-content: center;
+      opacity: 0;
+      transform: scaleY(0.2);
+      transform-origin: top;
+      transition: opacity 360ms ease, transform 360ms ease;
+    }
+
+    .connector.visible {
+      opacity: 1;
+      transform: scaleY(1);
+    }
+
+    .connector::before {
+      content: "";
+      width: 2px;
+      background: linear-gradient(var(--line), var(--accent));
+      border-radius: 999px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .path-link {
+      color: inherit;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(15, 118, 110, 0.35);
+    }
+
+    .path-link:hover,
+    .path-link:focus-visible {
+      color: var(--accent);
+      border-bottom-color: currentColor;
+      outline: none;
+    }
+
+    .detail-inner {
+      padding: 0 16px 16px;
+      color: #334155;
+    }
+
+    .detail-title {
+      margin: 14px 0 8px;
+      font-weight: 850;
+    }
+
+    ul {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    li + li {
+      margin-top: 6px;
+    }
+
+    code {
+      background: #eef2f7;
+      border: 1px solid #dbe2ec;
+      border-radius: 6px;
+      padding: 1px 5px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92em;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: var(--soft);
+      color: #0b5752;
+      font-weight: 750;
+      font-size: 0.84rem;
+    }
+
+    .tag.memory {
+      background: var(--soft-2);
+      color: #884000;
+    }
+
+    .tag.support {
+      background: var(--soft-3);
+      color: #34438f;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        width: min(100% - 20px, 1180px);
+        padding-top: 18px;
+      }
+
+      .topbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .controls {
+        align-self: flex-start;
+        flex-wrap: wrap;
+        border-radius: var(--radius);
+      }
+
+      .roles-legend {
+        grid-template-columns: 1fr;
+      }
+
+      body.roles-visible .roles-legend {
+        max-height: 360px;
+      }
+
+      .lane {
+        grid-template-columns: 1fr;
+      }
+
+      .node-row,
+      .node-row.triple {
+        grid-template-columns: 1fr;
+      }
+
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="topbar">
+      <div class="title-block">
+        <h1>Context engineering documentaire</h1>
+        <p class="subtitle">
+          Une carte des documents qui permettent de développer avec l'IA :
+          ce que l'agent doit lire, ce qu'il peut produire, ce qu'il peut
+          maintenir, et ce qui doit rester explicite pour guider son travail.
+        </p>
+      </div>
+      <div class="controls" aria-label="Contrôles de la carte">
+        <button class="action primary" type="button" id="expandBtn">Tout détailler</button>
+        <button class="action" type="button" id="collapseBtn">Replier les détails</button>
+        <button class="action" type="button" id="rolesBtn" aria-pressed="false">Apports IA</button>
+      </div>
+    </header>
+
+    <section class="map-shell" aria-labelledby="map-title">
+      <h2 id="map-title">Structure en couches</h2>
+      <p class="hint">Clique sur un bloc de la carte pour déplier son contenu, ou clique sur son nom pour ouvrir le fichier.</p>
+      <div class="legend" aria-label="Légende">
+        <span><i class="dot" aria-hidden="true"></i>Contexte à charger</span>
+        <span><i class="dot orange" aria-hidden="true"></i>Mémoire de travail</span>
+        <span><i class="dot blue" aria-hidden="true"></i>Support de cohérence</span>
+      </div>
+      <div class="roles-legend" aria-label="Légende des apports de l'IA">
+        <div class="role-item">
+          <span class="role-badge assisted">IA-assisted</span>
+          <span>L'IA aide à rédiger, structurer ou reformuler, sans porter seule le contenu.</span>
+        </div>
+        <div class="role-item">
+          <span class="role-badge draft">IA-draft</span>
+          <span>L'IA peut produire une première version à partir d'une spec, du code ou d'un plan.</span>
+        </div>
+        <div class="role-item">
+          <span class="role-badge maintainable">IA-maintenable</span>
+          <span>L'IA peut proposer des mises à jour à partir du code, des tests et du contexte de la conversation en cours.</span>
+        </div>
+        <div class="role-item">
+          <span class="role-badge produced">IA-produced</span>
+          <span>Document principalement généré par l'agent comme trace de travail ou d'exécution.</span>
+        </div>
+      </div>
+
+      <div class="flow" id="flow">
+        <div class="lane" data-step="0">
+          <div class="lane-label">Entrée agent</div>
+          <div class="node-row single">
+            <div class="node" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="../CLAUDE.md">../CLAUDE.md</a></span>
+              <div class="node-summary">Règles de travail, ordre de lecture et garde-fous.</div>
+              <div class="role-badges" aria-label="Apports de l’IA">
+                <span class="role-badge assisted">IA-assisted</span>
+              </div>
+              <div class="node-details">
+                <div class="detail-inner">
+                  <div class="detail-title">À mettre dedans</div>
+                  <ul>
+                    <li>Les documents à lire avant de modifier.</li>
+                    <li>Les règles de création de spec, review et README.</li>
+                    <li>Les limites d'action données à l'agent.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="connector" data-step="1" aria-hidden="true"></div>
+
+        <div class="lane" data-step="2">
+          <div class="lane-label">Vue globale</div>
+          <div class="node-row single">
+            <div class="node" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./architecture.md">./architecture.md</a></span>
+              <div class="node-summary">Vision stable, stack, principes, arborescence et règles transversales.</div>
+              <div class="role-badges" aria-label="Apports de l’IA">
+                <span class="role-badge assisted">IA-assisted</span>
+              </div>
+              <div class="node-details">
+                <div class="detail-inner">
+                  <div class="detail-title">À mettre dedans</div>
+                  <ul>
+                    <li>Vision système, acteurs et workflows globaux.</li>
+                    <li>Stack, principes architecturaux et conventions.</li>
+                    <li>Questions ouvertes qui touchent plusieurs features.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="connector" data-step="3" aria-hidden="true"></div>
+
+        <div class="lane" data-step="4">
+          <div class="lane-label">Vues transversales</div>
+          <div class="node-row">
+            <div class="node" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./features.md">./features.md</a></span>
+              <div class="node-summary">Carte produit front/back, parcours, contrats et cas limites.</div>
+              <div class="role-badges" aria-label="Apports de l’IA">
+                <span class="role-badge assisted">IA-assisted</span>
+                <span class="role-badge maintainable">IA-maintenable</span>
+              </div>
+              <div class="node-details">
+                <div class="detail-inner">
+                  <div class="detail-title">À mettre dedans</div>
+                  <ul>
+                    <li>But métier et parcours utilisateur par feature.</li>
+                    <li>Contrat front/back et pages concernées.</li>
+                    <li>Cas limites utiles pour éviter les erreurs d'agent.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="node" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./data-model.md">./data-model.md</a></span>
+              <div class="node-summary">Schéma SQLite, relations, contraintes et mapping feature -> tables.</div>
+              <div class="role-badges" aria-label="Apports de l’IA">
+                <span class="role-badge maintainable">IA-maintenable</span>
+              </div>
+              <div class="node-details">
+                <div class="detail-inner">
+                  <div class="detail-title">À mettre dedans</div>
+                  <ul>
+                    <li>Tables, relations et contraintes importantes.</li>
+                    <li>Mapping entre features backend et tables utilisées.</li>
+                    <li>Limites DB, migrations et questions ouvertes.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="connector" data-step="5" aria-hidden="true"></div>
+
+        <div class="lane" data-step="6">
+          <div class="lane-label">Contexte local</div>
+          <div class="node-row single">
+            <div class="node" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="../backend/src/features/applications/README.md">../backend/src/features/&lt;feature&gt;/README.md</a></span>
+              <div class="node-summary">Détails backend proches du code pour la feature impactée.</div>
+              <div class="role-badges" aria-label="Apports de l’IA">
+                <span class="role-badge draft">IA-draft</span>
+                <span class="role-badge maintainable">IA-maintenable</span>
+              </div>
+              <div class="node-details">
+                <div class="detail-inner">
+                  <div class="detail-title">À mettre dedans</div>
+                  <ul>
+                    <li>Endpoints, modèle local et règles serveur.</li>
+                    <li>Accès données, permissions et scénarios de tests.</li>
+                    <li>Contexte à lire juste avant de toucher une feature.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="connector" data-step="7" aria-hidden="true"></div>
+
+        <div class="lane" data-step="8">
+          <div class="lane-label">Avant / pendant / après</div>
+          <div class="node-row triple">
+            <div class="node memory" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./specs/">./specs/</a></span>
+              <div class="node-summary">Intention et critères d'acceptation avant changement.</div>
+              <div class="role-badges" aria-label="Apports de l’IA">
+                <span class="role-badge assisted">IA-assisted</span>
+              </div>
+              <div class="node-details">
+                <div class="detail-inner">
+                  <div class="detail-title">À mettre dedans</div>
+                  <ul>
+                    <li>Contexte, objectif, périmètre et comportement attendu.</li>
+                    <li>Critères d'acceptation et impacts techniques connus.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="node memory" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./plans/">./plans/</a></span>
+              <div class="node-summary">Checklist d'exécution pour les travaux significatifs.</div>
+              <div class="role-badges" aria-label="Apports de l’IA">
+                <span class="role-badge draft">IA-draft</span>
+              </div>
+              <div class="node-details">
+                <div class="detail-inner">
+                  <div class="detail-title">À mettre dedans</div>
+                  <ul>
+                    <li>Décision d'approche et tâches ordonnées.</li>
+                    <li>Vérifications à faire avant de terminer.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="node memory" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./reviews/">./reviews/</a></span>
+              <div class="node-summary">Bilan daté, écarts, vérifications, risques et reste à faire.</div>
+              <div class="role-badges" aria-label="Apports de l’IA">
+                <span class="role-badge produced">IA-produced</span>
+              </div>
+              <div class="node-details">
+                <div class="detail-inner">
+                  <div class="detail-title">À mettre dedans</div>
+                  <ul>
+                    <li>Travail réalisé, fichiers impactés et écarts.</li>
+                    <li>Tests, risques, limites et incertitudes restantes.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="connector" data-step="9" aria-hidden="true"></div>
+
+        <div class="lane" data-step="10">
+          <div class="lane-label">Formes standard</div>
+          <div class="node-row single">
+            <div class="node support" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./templates/README.md">./templates/README.md</a></span>
+              <div class="node-summary">Modèles pour garder les specs, reviews et README cohérents.</div>
+              <div class="role-badges" aria-label="Apports de l’IA">
+                <span class="role-badge assisted">IA-assisted</span>
+              </div>
+              <div class="node-details">
+                <div class="detail-inner">
+                  <div class="detail-title">À mettre dedans</div>
+                  <ul>
+                    <li>Templates de spec, review, data model et feature map.</li>
+                    <li>Template de README backend de feature.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    const expandBtn = document.querySelector('#expandBtn');
+    const collapseBtn = document.querySelector('#collapseBtn');
+    const rolesBtn = document.querySelector('#rolesBtn');
+    const deployables = Array.from(document.querySelectorAll('.lane, .connector'));
+    const nodes = Array.from(document.querySelectorAll('.node'));
+
+    function shouldIgnoreToggle(event) {
+      return Boolean(event.target.closest('a'));
+    }
+
+    function toggleOnKeyboard(event, callback) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      callback();
+    }
+
+    function openNode(node) {
+      const details = node.querySelector('.node-details');
+      if (!details) return;
+      node.classList.add('open');
+      node.setAttribute('aria-expanded', 'true');
+      details.style.maxHeight = details.scrollHeight + 'px';
+    }
+
+    function closeNode(node) {
+      const details = node.querySelector('.node-details');
+      if (!details) return;
+      node.classList.remove('open');
+      node.setAttribute('aria-expanded', 'false');
+      details.style.maxHeight = '0px';
+    }
+
+    function toggleNode(node) {
+      if (node.classList.contains('open')) {
+        closeNode(node);
+      } else {
+        openNode(node);
+      }
+    }
+
+    function deploy() {
+      deployables.forEach((item) => {
+        item.classList.remove('visible');
+        const step = Number(item.dataset.step || 0);
+        window.setTimeout(() => item.classList.add('visible'), 120 + step * 130);
+      });
+    }
+
+    nodes.forEach((node) => {
+      node.addEventListener('click', (event) => {
+        if (shouldIgnoreToggle(event)) return;
+        toggleNode(node);
+      });
+      node.addEventListener('keydown', (event) => {
+        toggleOnKeyboard(event, () => toggleNode(node));
+      });
+    });
+
+    expandBtn.addEventListener('click', () => {
+      nodes.forEach(openNode);
+    });
+
+    collapseBtn.addEventListener('click', () => {
+      nodes.forEach(closeNode);
+    });
+
+    rolesBtn.addEventListener('click', () => {
+      const isVisible = document.body.classList.toggle('roles-visible');
+      rolesBtn.classList.toggle('is-active', isVisible);
+      rolesBtn.setAttribute('aria-pressed', String(isVisible));
+    });
+
+    window.addEventListener('resize', () => {
+      nodes.filter((node) => node.classList.contains('open')).forEach(openNode);
+    });
+
+    deploy();
+  </script>
+</body>
+</html>

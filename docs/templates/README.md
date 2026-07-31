@@ -4,6 +4,16 @@ La structure documentaire cible actuelle est volontairement légère.
 
 ## À utiliser maintenant
 
+### Plan d'exécution
+
+Utiliser `docs/templates/plan-template.md` pour créer ou maintenir :
+
+* `docs/plans/YYYY-MM-DD-nom-du-plan.md`
+
+Ce document structure un plan d'exécution sans répéter la documentation de
+contexte : objectif, périmètre, impacts prévus, décisions propres au plan,
+tâches cochables, vérifications, observables humains et self-review.
+
 ### Carte des features
 
 Utiliser `docs/templates/features-map-template.md` pour créer ou maintenir :

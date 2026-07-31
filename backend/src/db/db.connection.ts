@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { join } from 'path';
 import { mkdirSync } from 'fs';
-import { runMigrations } from './db.migrate';
+import { runMigrations, runSeed } from './db.migrate';
 
 export type { Database } from 'better-sqlite3';
 
@@ -15,6 +15,7 @@ export function getDb(): Database.Database {
     _db.pragma('journal_mode = WAL');
     _db.pragma('foreign_keys = ON');
     runMigrations(_db);
+    runSeed(_db);
   }
   return _db;
 }
@@ -22,7 +23,7 @@ export function getDb(): Database.Database {
 export function createTestDb(): Database.Database {
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
-  runMigrations(db, { seedDemo: false });
+  runMigrations(db);
   return db;
 }
 
