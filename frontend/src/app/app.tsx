@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { RoleProvider, useRole } from '../context/role-context';
+import { AuthProvider } from '../context/auth-context';
+import { LoginPage } from '../pages/login.page';
+import { AuthCheckPage } from '../pages/auth-check.page';
 import { AppLayout } from '../components/app-layout';
 import { HomePage } from '../pages/home.page';
 import { CompaniesPage } from '../pages/companies.page';
@@ -33,6 +36,10 @@ function RequireWrite({ children }: { children: ReactNode }) {
 function AppRoutes() {
   return (
     <Routes>
+      {/* Pilote authentification (jalon 1) : isole du reste de l'app, ne remplace pas encore /select-role. */}
+      <Route path="/login" element={<AuthProvider><LoginPage /></AuthProvider>} />
+      <Route path="/auth-check" element={<AuthProvider><AuthCheckPage /></AuthProvider>} />
+
       <Route path="/select-role" element={<RoleSelectPage />} />
       <Route
         path="/"

@@ -207,19 +207,22 @@ Les fichiers du pilote portent leurs responsabilités définitives afin d'être
 
 * [ ] Ajouter dans Entra l'URI Web locale
       `http://localhost:5173/api/auth/callback` sans supprimer l'URI de
-      production.
+      production. *(action humaine dans le portail Azure — non faite par
+      l'agent)*
 * [ ] Créer un secret client de test, conserver sa valeur uniquement dans
       `backend/.env` ignoré par Git et noter son expiration hors du dépôt.
-* [ ] Ajouter `@azure/msal-node`, `express-session` et `dotenv`, ainsi que les
+      *(action humaine — non faite par l'agent, `backend/.env.example`
+      préparé)*
+* [x] Ajouter `@azure/msal-node`, `express-session` et `dotenv`, ainsi que les
       types TypeScript nécessaires.
-* [ ] Valider `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`,
+* [x] Valider `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `ENTRA_CLIENT_SECRET`,
       `ENTRA_REDIRECT_URI`, `APP_BASE_URL`, `SESSION_SECRET` et
       `GESTA_MANAGER_EMAIL`.
-* [ ] Utiliser pour le pilote `APP_BASE_URL=http://localhost:5173` et
+* [x] Utiliser pour le pilote `APP_BASE_URL=http://localhost:5173` et
       l'adresse gestionnaire `gregory.seront@vinci.be`.
-* [ ] Ajouter `npm run auth:config:check` sans jamais afficher les valeurs
+* [x] Ajouter `npm run auth:config:check` sans jamais afficher les valeurs
       sensibles.
-* [ ] Refuser explicitement l'activation du pilote avec `NODE_ENV=production`
+* [x] Refuser explicitement l'activation du pilote avec `NODE_ENV=production`
       tant que le store SQLite n'est pas en place.
 
 **Verification:**
@@ -250,25 +253,25 @@ Les fichiers du pilote portent leurs responsabilités définitives afin d'être
 
 **Travail :**
 
-* [ ] Définir une interface injectable pour générer l'URL Microsoft, échanger
+* [x] Définir une interface injectable pour générer l'URL Microsoft, échanger
       le code et lire Graph `/me` sans réseau dans les tests.
-* [ ] Utiliser l'autorité spécifique au tenant et les scopes `openid`,
+* [x] Utiliser l'autorité spécifique au tenant et les scopes `openid`,
       `profile`, `email` et `User.Read`.
-* [ ] Monter une session locale `HttpOnly`, `SameSite=Lax`, non `Secure` sur
+* [x] Monter une session locale `HttpOnly`, `SameSite=Lax`, non `Secure` sur
       localhost, avec le `MemoryStore` explicitement limité au pilote.
-* [ ] Implémenter `/login` avec `state`, `nonce` et PKCE conservés dans la
+* [x] Implémenter `/login` avec `state`, `nonce` et PKCE conservés dans la
       session temporaire.
-* [ ] Implémenter `/callback` : validation du retour, échange du code, appel
+* [x] Implémenter `/callback` : validation du retour, échange du code, appel
       Graph `/me`, vérification du tenant et comparaison exacte du
       `userPrincipalName` gestionnaire.
-* [ ] Régénérer l'identifiant de session après connexion et vider de la session
+* [x] Régénérer l'identifiant de session après connexion et vider de la session
       et du cache MSAL le code verifier, le nonce et les jetons Microsoft.
-* [ ] Implémenter `/me` avec seulement le nom, l'adresse et le rôle
+* [x] Implémenter `/me` avec seulement le nom, l'adresse et le rôle
       `gestionnaire`, ou le statut `pilot_not_manager`.
-* [ ] Implémenter la déconnexion locale par `POST`, destruction de session et
+* [x] Implémenter la déconnexion locale par `POST`, destruction de session et
       suppression du cookie.
-* [ ] Ne monter aucun garde global et ne modifier aucune route métier.
-* [ ] Tester avec un faux fournisseur Entra les retours valides, tenant/audience
+* [x] Ne monter aucun garde global et ne modifier aucune route métier.
+* [x] Tester avec un faux fournisseur Entra les retours valides, tenant/audience
       invalides, `state` invalide, compte non gestionnaire et logout.
 
 **Verification:**
@@ -301,18 +304,18 @@ Les fichiers du pilote portent leurs responsabilités définitives afin d'être
 
 **Travail :**
 
-* [ ] Ajouter `/login` avec un unique bouton « Se connecter avec Microsoft »
+* [x] Ajouter `/login` avec un unique bouton « Se connecter avec Microsoft »
       qui navigue vers `/api/auth/login`.
-* [ ] Ajouter `/auth-check` comme destination du callback avec les états
+* [x] Ajouter `/auth-check` comme destination du callback avec les états
       chargement, erreur, compte non gestionnaire et connexion réussie.
-* [ ] Afficher uniquement, en cas de succès, le nom, l'adresse et
+* [x] Afficher uniquement, en cas de succès, le nom, l'adresse et
       « Rôle : Gestionnaire » renvoyés par `/api/auth/me`.
-* [ ] Ajouter une action « Se déconnecter » puis retour à `/login`.
-* [ ] Utiliser un `AuthProvider` limité aux routes pilote mais conçu pour être
+* [x] Ajouter une action « Se déconnecter » puis retour à `/login`.
+* [x] Utiliser un `AuthProvider` limité aux routes pilote mais conçu pour être
       étendu lors de l'intégration finale.
-* [ ] Conserver temporairement `RoleProvider`, `/select-role` et toute la
+* [x] Conserver temporairement `RoleProvider`, `/select-role` et toute la
       navigation métier existante sans interaction avec la session pilote.
-* [ ] Ne pas ajouter encore de redirection automatique depuis les pages métier
+* [x] Ne pas ajouter encore de redirection automatique depuis les pages métier
       vers `/login`.
 
 **Verification:**
