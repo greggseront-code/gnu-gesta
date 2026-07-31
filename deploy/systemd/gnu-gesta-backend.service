@@ -8,6 +8,10 @@ User=ubuntu
 WorkingDirectory=/home/ubuntu/gnu-gesta/backend
 Environment=NODE_ENV=production
 Environment=PORT=3000
+# Valeur par defaut ci-dessus ; surchargeable de facon persistante via
+# deploy.sh (voir docs/deployment.md). Le prefixe "-" rend ce fichier
+# optionnel : s'il est absent, NODE_ENV=production (ci-dessus) s'applique.
+EnvironmentFile=-/etc/gnu-gesta/deploy-env.conf
 ExecStart=/home/ubuntu/gnu-gesta/backend/node_modules/.bin/tsx src/server.ts
 Restart=on-failure
 RestartSec=5

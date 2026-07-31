@@ -59,6 +59,7 @@ User=ubuntu
 WorkingDirectory=/home/ubuntu/gnu-gesta/backend
 Environment=NODE_ENV=production
 Environment=PORT=3000
+EnvironmentFile=-/etc/gnu-gesta/deploy-env.conf
 ExecStart=/home/ubuntu/gnu-gesta/backend/node_modules/.bin/tsx src/server.ts
 Restart=on-failure
 RestartSec=5
@@ -77,6 +78,13 @@ Points notables :
   ce problème. `npm run build` reste utile pour la vérification de types,
   mais son résultat n'est pas exécuté en production.
 * `Restart=on-failure` : redémarrage auto si le process s'arrête en erreur.
+* `EnvironmentFile=-/etc/gnu-gesta/deploy-env.conf` : fichier optionnel (le
+  préfixe `-` évite une erreur systemd s'il est absent) qui peut surcharger
+  `NODE_ENV` défini juste au-dessus. Ce fichier n'est **pas** versionné dans
+  Git : il est créé/modifié uniquement par `deploy.sh` (voir
+  "Environnement runtime : production vs staging" plus bas). En son
+  absence, `NODE_ENV=production` (câblé juste au-dessus) s'applique — c'est
+  le comportement par défaut, non régressif.
 
 Commandes utiles :
 
@@ -197,7 +205,8 @@ session SSH à la main) :
 ./deploy/deploy-prod.sh
 ```
 
-Ce script ne fait qu'un `ssh` vers le VPS et y lance `deploy.sh`.
+Ce script ne fait qu'un `ssh` vers le VPS et y lance `deploy.sh`, en relayant
+les options éventuelles (voir "Environnement runtime" plus bas).
 
 **Depuis une session SSH sur le VPS** (équivalent, en étant déjà connecté) :
 
@@ -205,20 +214,40 @@ Ce script ne fait qu'un `ssh` vers le VPS et y lance `deploy.sh`.
 cd /home/ubuntu/gnu-gesta && ./deploy/deploy.sh
 ```
 
+`./deploy/deploy.sh -h` affiche l'aide complète des options. Les deux
+options disponibles peuvent se combiner :
+
+* `--env production|staging` : voir "Environnement runtime" plus bas.
+* `--skip-git` : déploie l'état actuel du repo **tel quel** (pas de `git
+  fetch`/`merge`, pas de vérification d'arbre propre). Réservé aux tests
+  locaux avant de committer/pousser — le repo peut alors contenir des
+  modifications non commitées. Sans cette option, `deploy.sh` refuse de
+  continuer si l'arbre n'est pas propre.
+
 `deploy.sh` effectue, dans l'ordre, et s'arrête net à la première erreur :
 
-1. Vérifie que le repo VPS est sur `main` et n'a aucune modification non
-   commitée (sinon : arrêt, pour ne jamais déployer un état incertain).
-2. `git fetch` + `git merge --ff-only origin/main`.
-3. `npm ci` dans `backend/` et `frontend/`.
-4. `npm run build` dans `frontend/` (régénère `dist/`).
-5. Recopie `deploy/nginx/gng.seront.be.conf` vers
+1. Si `--env` est fourni, vérifie qu'il vaut `production` ou `staging`
+   (sinon : arrêt immédiat, avant toute action).
+2. Vérifie que le repo VPS est sur `main`.
+3. Sans `--skip-git` : vérifie qu'il n'y a aucune modification non commitée
+   (sinon arrêt, pour ne jamais déployer un état incertain par accident),
+   puis `git fetch` + `git merge --ff-only origin/main`.
+   Avec `--skip-git` : saute ces deux vérifications et affiche l'état
+   (`git status --short`) à titre informatif seulement.
+4. `npm ci` dans `backend/` et `frontend/`.
+5. `npm run build` dans `frontend/` (régénère `dist/`).
+6. Recopie `deploy/nginx/gng.seront.be.conf` vers
    `/etc/nginx/sites-available/gng.seront.be`, valide (`nginx -t`) et
    recharge Nginx.
-6. Recopie `deploy/systemd/gnu-gesta-backend.service` vers
+7. Si `--env` a été fourni, écrit `NODE_ENV=<valeur>` dans
+   `/etc/gnu-gesta/deploy-env.conf` ; sinon laisse ce fichier tel quel.
+8. Recopie `deploy/systemd/gnu-gesta-backend.service` vers
    `/etc/systemd/system/`, `daemon-reload`, puis redémarre le backend.
-7. Vérifie que `https://gng.seront.be` répond en HTTP 200 ; sinon le script
-   se termine en erreur pour signaler un déploiement potentiellement cassé.
+9. Vérifie que `https://gng.seront.be/` **et**
+   `https://gng.seront.be/api/health` répondent en HTTP 200 ; sinon le
+   script se termine en erreur pour signaler un déploiement potentiellement
+   cassé (voir "Environnement runtime" plus bas pour pourquoi les deux
+   vérifications sont nécessaires).
 
 Un verrou (`flock` sur `/tmp/gnu-gesta-deploy.lock`) empêche deux
 déploiements de tourner en même temps.
@@ -226,6 +255,53 @@ déploiements de tourner en même temps.
 Aucun déclenchement automatique n'existe (pas de webhook, pas de CI/CD sur
 push) : c'est un choix assumé, le déploiement doit toujours être une action
 volontaire.
+
+## Environnement runtime : production vs staging
+
+Le pilote authentification Microsoft Entra
+(`docs/specs/2026-07-31-authentification-microsoft-entra-v1.md`) refuse de
+démarrer avec `NODE_ENV=production` tant que le store de session SQLite du
+jalon 2 n'existe pas (`assertPilotEnvironmentAllowed()` dans
+`backend/src/features/auth/auth.config.ts`). Le VPS n'héberge pour l'instant
+que des données fictives : `NODE_ENV` peut donc être temporairement basculé
+sur `staging` pour tester le pilote en conditions réelles sur ce même VPS,
+sans en créer un second.
+
+```bash
+./deploy/deploy-prod.sh --env staging      # bascule et deploie
+./deploy/deploy-prod.sh                    # redeploie, sans toucher a l'environnement en place
+./deploy/deploy-prod.sh --env production   # revient explicitement en production
+```
+
+Pour tester du code pas encore commité/poussé (avant de committer, le temps
+de valider un changement) :
+
+```bash
+./deploy/deploy-prod.sh --skip-git --env staging
+```
+
+* Sans `--env`, `deploy.sh` ne modifie jamais l'environnement runtime en
+  place : un redéploiement ordinaire après `staging` reste en `staging`.
+* `--skip-git` déploie l'arbre tel quel, modifications non commitées
+  comprises, sans jamais toucher à `git` (pas de fetch, pas de merge). Ce
+  n'est pas la valeur par défaut : sans cette option, un arbre non propre
+  fait toujours échouer `deploy.sh` avant toute action, pour qu'on ne
+  puisse pas déployer un état incertain par inadvertance une fois revenu au
+  workflow normal.
+* La valeur choisie est persistée dans `/etc/gnu-gesta/deploy-env.conf`
+  (hors dépôt Git, une seule ligne `NODE_ENV=...`), lu par le service
+  systemd via `EnvironmentFile=-/etc/gnu-gesta/deploy-env.conf`.
+* Si ce fichier n'existe pas (VPS neuf, ou supprimé manuellement),
+  `NODE_ENV=production` s'applique par défaut (câblé dans
+  `deploy/systemd/gnu-gesta-backend.service`) : le comportement par défaut
+  reste non régressif.
+* C'est pour détecter un backend qui ne démarre pas dans ce genre de
+  scénario que la vérification finale de `deploy.sh` teste aussi
+  `/api/health`, pas seulement `/` : `/` est une page statique servie par
+  Nginx indépendamment de l'état du backend Express, elle répondrait donc
+  même si le backend est en crash-loop.
+* Voir `docs/specs/2026-07-31-deploy-node-env-configurable.md` pour le détail
+  de cette évolution.
 
 ## Limites connues
 
@@ -249,4 +325,6 @@ volontaire.
 * Review (mise en place HTTPS) : `docs/reviews/2026-07-30-https-reverse-proxy-gng.md`
 * Spec (déploiement semi-automatisé) : `docs/specs/2026-07-30-deploiement-semi-automatise.md`
 * Review (déploiement semi-automatisé) : `docs/reviews/2026-07-30-deploiement-semi-automatise.md`
+* Spec (environnement runtime configurable) : `docs/specs/2026-07-31-deploy-node-env-configurable.md`
+* Spec (pilote authentification Microsoft Entra) : `docs/specs/2026-07-31-authentification-microsoft-entra-v1.md`
 * Architecture applicative : `docs/architecture.md`
