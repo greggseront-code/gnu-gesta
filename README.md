@@ -22,6 +22,12 @@ npm install
 npm run dev
 ```
 
+**Sur un serveur/VPS (via SSH) :** utiliser plutôt `./dev.sh` à la racine, qui
+lance backend et frontend dans deux sessions `tmux` ("backend", "frontend").
+Ces process survivent à la fermeture de la session SSH — `tmux attach -t
+backend` (ou `frontend`) pour s'y rattacher, `Ctrl+b` puis `d` pour se
+détacher sans arrêter le process.
+
 ## Tests
 
 ```bash

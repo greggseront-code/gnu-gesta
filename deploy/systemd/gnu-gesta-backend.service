@@ -1,0 +1,16 @@
+[Unit]
+Description=GNU Gesta backend (Express)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/gnu-gesta/backend
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/home/ubuntu/gnu-gesta/backend/node_modules/.bin/tsx src/server.ts
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

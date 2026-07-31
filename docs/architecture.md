@@ -33,6 +33,8 @@ Acteurs principaux:
 - `backend/src/features/*/README.md`: details backend locaux par feature.
 - `docs/specs/`: specs datees pour les changements non triviaux.
 - `docs/reviews/`: bilans datees des taches significatives.
+- `docs/deployment.md`: hebergement, DNS, Nginx, HTTPS et procedure de
+  redeploiement.
 
 ## Principes architecturaux
 

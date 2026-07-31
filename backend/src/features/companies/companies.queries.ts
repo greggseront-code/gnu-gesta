@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import type { Company, CompanyContact, CompanyInput, ContactInput } from './companies.types';
+import type { Company, CompanyContact, CompanyInput, CompanyWithContacts, ContactInput } from './companies.types';
 
 export function insertCompany(db: Database, input: Omit<CompanyInput, 'contacts'>): Company {
   return db
