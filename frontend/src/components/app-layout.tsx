@@ -96,7 +96,7 @@ export function AppLayout() {
             {baseRole === 'gestionnaire' && !isImpersonating && (
               <div className="sidebar-section">
                 <div className="sidebar-section-title">Gestionnaire</div>
-                <NavLink to="/impersonate" className={link}>Voir comme…</NavLink>
+                <NavLink to="/impersonate" className={link}>Changer de rôle</NavLink>
               </div>
             )}
           </nav>

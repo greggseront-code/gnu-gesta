@@ -47,6 +47,12 @@ test('apiFetch envoie le jeton CSRF sur une mutation, pas sur un GET', async () 
   }));
 });
 
+test('apiFetch ne tente pas de parser le corps JSON d\'une réponse 204', async () => {
+  vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+  await expect(apiFetch('/auth/impersonation', { method: 'DELETE' })).resolves.toBeUndefined();
+});
+
 test('apiFetch déclenche le handler global sur un 401', async () => {
   const handler = vi.fn();
   setUnauthorizedHandler(handler);

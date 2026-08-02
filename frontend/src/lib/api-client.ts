@@ -40,5 +40,10 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { error?: string }).error ?? `${res.status} ${res.statusText}`);
   }
+  // 204 (logout, fin d'incarnation) n'a pas de corps : res.json() lèverait
+  // une erreur de parsing JSON sur une chaîne vide.
+  if (res.status === 204) {
+    return undefined as T;
+  }
   return res.json() as Promise<T>;
 }

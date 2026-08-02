@@ -76,7 +76,7 @@ export function ImpersonationSelectPage() {
           <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '0.5rem' }}>
             gnu-gesta
           </div>
-          <h1 className="role-select-title">Voir comme…</h1>
+          <h1 className="role-select-title">Changer de rôle</h1>
           <p className="role-select-subtitle">
             Mode temporaire réservé au gestionnaire : votre identité de base reste disponible à tout moment.
           </p>
