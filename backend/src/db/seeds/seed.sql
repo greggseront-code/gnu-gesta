@@ -80,6 +80,14 @@ INSERT OR IGNORE INTO company_contacts (id, company_id, first_name, last_name, e
   (25, 17, 'Hanne',       'Claes',        'h.claes@kbc.be',              '+32 2 429 12 41', '["HR Coordinator"]');
 
 -- ── Offres (30) ────────────────────────────────────────────────────────────────
+-- Les entreprises et contacts du seed sont déjà validés à la création de la DB.
+-- La date correspond donc au moment de l'exécution du seed.
+UPDATE companies SET validated_at = datetime('now')
+WHERE validation_status = 'validated' AND validated_at IS NULL;
+
+UPDATE company_contacts SET validated_at = datetime('now')
+WHERE validation_status = 'validated' AND validated_at IS NULL;
+
 -- 5 soumise · 12 validee_et_visible · 8 prise · 3 non_disponible · 2 refusee
 INSERT OR IGNORE INTO offers
   (id, company_id, priority_contact_id, description, location, technologies, objectives,
