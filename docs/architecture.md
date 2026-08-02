@@ -37,6 +37,8 @@ Acteurs principaux:
   redeploiement.
 - `docs/production-readiness.md`: decisions prises "pour l'instant, en
   developpement" a reprendre avant une vraie mise en production.
+- `docs/future-extensions.md`: evolutions produit identifiees mais hors du
+  perimetre des specs et plans actifs.
 
 ## Principes architecturaux
 
