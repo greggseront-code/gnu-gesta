@@ -7,9 +7,12 @@ import { insertCompany, insertContact } from '../src/features/companies/companie
 import { loginAsGestionnaire, loginAsLecteur, loginAsEtudiant, loginAsEntreprise, type AuthenticatedAgent } from './helpers/authenticated-agent';
 
 const validContact = { first_name: 'Jean', last_name: 'Dupont', email: 'j@d.com', roles: ['maitre_de_stage'] };
+// Nom distinct des entreprises créées par le beforeEach ('Acme Corp' / 'Other
+// Corp') : le couple nom/adresse est désormais unique, une même valeur
+// entrerait en conflit (409) avec la fixture plutôt que de tester le rôle.
 const validCompanyBody = {
-  name: 'Acme Corp',
-  general_email: 'contact@acme.com',
+  name: 'New Ventures SPRL',
+  general_email: 'contact@newventures.com',
   contacts: [validContact],
 };
 
@@ -232,6 +235,30 @@ describe('access control — offers routes', () => {
       .set('x-csrf-token', entreprise.csrfToken);
     expect(res.status).toBe(403);
   });
+
+  it("le lecteur ne voit pas une offre soumise en liste ni en détail (403)", async () => {
+    const entreprise = await loginAsEntreprise(companyId);
+    const soumiseRes = await entreprise.agent
+      .post('/api/offers')
+      .set('x-csrf-token', entreprise.csrfToken)
+      .send({ company_id: companyId, priority_contact_id: contactId, contact_ids: [contactId], description: 'Soumise', remote_allowed: false });
+    expect(soumiseRes.body.status).toBe('soumise');
+
+    const lecteur = await loginAsLecteur();
+    const list = await lecteur.agent.get('/api/offers');
+    expect(list.body.map((o: { id: number }) => o.id)).not.toContain(soumiseRes.body.id);
+    expect(list.body.map((o: { id: number }) => o.id)).toContain(offerId); // validee_et_visible, créée par le gestionnaire
+
+    const detail = await lecteur.agent.get(`/api/offers/${soumiseRes.body.id}`);
+    expect(detail.status).toBe(403);
+  });
+
+  it('GET /api/offers/:id/dependencies est réservé au gestionnaire', async () => {
+    const lecteur = await loginAsLecteur();
+    expect((await lecteur.agent.get(`/api/offers/${offerId}/dependencies`)).status).toBe(403);
+    expect((await request(app).get(`/api/offers/${offerId}/dependencies`)).status).toBe(401);
+    expect((await manager.agent.get(`/api/offers/${offerId}/dependencies`)).status).toBe(200);
+  });
 });
 
 describe('access control — applications routes', () => {
@@ -296,5 +323,73 @@ describe('access control — applications routes', () => {
       .send({ application_id: applicationId });
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('prise');
+  });
+});
+
+describe('access control — routes de modération gestionnaire (401/403)', () => {
+  let db: Database;
+  let manager: AuthenticatedAgent;
+  let companyId: number;
+  let contactId: number;
+
+  beforeEach(async () => {
+    db = createTestDb();
+    setDb(db);
+    manager = await loginAsGestionnaire();
+    companyId = insertCompany(db, { name: 'Acme', general_email: 'acme@acme.com' }).id;
+    contactId = insertContact(db, companyId, {
+      first_name: 'Jean', last_name: 'Dupont', email: 'j@d.com', roles: ['maitre_de_stage'],
+    }).id;
+  });
+
+  afterEach(() => db.close());
+
+  const moderationRoutes: { method: 'get' | 'post' | 'patch' | 'delete'; path: () => string }[] = [
+    { method: 'get', path: () => '/api/companies/pending' },
+    { method: 'post', path: () => `/api/companies/${companyId}/validate` },
+    { method: 'delete', path: () => `/api/companies/${companyId}` },
+    { method: 'post', path: () => `/api/companies/contacts/${contactId}/validate` },
+    { method: 'patch', path: () => `/api/companies/contacts/${contactId}` },
+    { method: 'delete', path: () => `/api/companies/contacts/${contactId}` },
+  ];
+
+  for (const { method, path } of moderationRoutes) {
+    it(`${method.toUpperCase()} ${path()} anonyme reçoit 401`, async () => {
+      const res = await request(app)[method](path());
+      expect(res.status).toBe(401);
+    });
+
+    it(`${method.toUpperCase()} ${path()} lecteur reçoit 403`, async () => {
+      const lecteur = await loginAsLecteur();
+      const res = lecteur.agent[method](path()).set('x-csrf-token', lecteur.csrfToken);
+      expect((await res).status).toBe(403);
+    });
+
+    it(`${method.toUpperCase()} ${path()} étudiant reçoit 403`, async () => {
+      db.prepare('INSERT INTO students (first_name, last_name, email) VALUES (?,?,?)').run('E', 'T', 'moderation-check@student.vinci.be');
+      const etudiant = await loginAsEtudiant('moderation-check@student.vinci.be');
+      const res = etudiant.agent[method](path()).set('x-csrf-token', etudiant.csrfToken);
+      expect((await res).status).toBe(403);
+    });
+  }
+
+  it('PATCH /api/offers/:id/assignment anonyme reçoit 401, étudiant reçoit 403', async () => {
+    const offerRes = await manager.agent
+      .post('/api/offers')
+      .set('x-csrf-token', manager.csrfToken)
+      .send({ company_id: companyId, priority_contact_id: contactId, contact_ids: [contactId], description: 'Test', remote_allowed: false });
+    const offerId = offerRes.body.id;
+    const assignment = { company_id: companyId, priority_contact_id: contactId, contact_ids: [contactId] };
+
+    const anon = await request(app).patch(`/api/offers/${offerId}/assignment`).send(assignment);
+    expect(anon.status).toBe(401);
+
+    db.prepare('INSERT INTO students (first_name, last_name, email) VALUES (?,?,?)').run('E', 'T', 'assignment-check@student.vinci.be');
+    const etudiant = await loginAsEtudiant('assignment-check@student.vinci.be');
+    const res = await etudiant.agent
+      .patch(`/api/offers/${offerId}/assignment`)
+      .set('x-csrf-token', etudiant.csrfToken)
+      .send(assignment);
+    expect(res.status).toBe(403);
   });
 });

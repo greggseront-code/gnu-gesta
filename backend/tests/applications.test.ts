@@ -183,10 +183,13 @@ describe('applications backend', () => {
   // ─── Nouvelles tests de sécurité ─────────────────────────────────
 
   it('postuler à une offre non-validée retourne 422', async () => {
-    // Create a new offer that stays in "soumise" status (not validated)
-    const offerRes = await manager.agent
+    // Create a new offer that stays in "soumise" status (not validated) : une
+    // offre créée par le gestionnaire est désormais directement publiée, il
+    // faut donc passer par une création entreprise pour rester "soumise".
+    const entrepriseCreator = await loginAsEntreprise(companyId);
+    const offerRes = await entrepriseCreator.agent
       .post('/api/offers')
-      .set('x-csrf-token', manager.csrfToken)
+      .set('x-csrf-token', entrepriseCreator.csrfToken)
       .send({
         company_id: companyId,
         priority_contact_id: contactId,

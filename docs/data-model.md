@@ -33,8 +33,12 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
   `backend/src/features/auth/session.store.ts`), 8h renouvelables. Remplace
   le `MemoryStore` du pilote.
 * `students` : référentiel des étudiants.
-* `companies` : référentiel des entreprises.
-* `company_contacts` : contacts rattachés aux entreprises.
+* `companies` : référentiel des entreprises. Porte un état de validation
+  (`validation_status`), l'étudiant créateur éventuel
+  (`submitted_by_student_id`) et la date de validation (`validated_at`).
+* `company_contacts` : contacts rattachés aux entreprises. Mêmes colonnes de
+  validation que `companies`, plus `created_with_company` (contact de la
+  soumission initiale d'une entreprise vs ajouté séparément).
 * `offers` : offres de stage et propositions étudiantes.
 * `offer_contacts` : table de liaison entre offres et contacts.
 * `applications` : candidatures des étudiants aux offres.
@@ -43,6 +47,10 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
 ## Relations
 
 * `company_contacts.company_id` référence `companies.id`.
+* `companies.submitted_by_student_id` référence `students.id` (étudiant
+  créateur d'une soumission ; `NULL` pour un élément créé directement validé).
+* `company_contacts.submitted_by_student_id` référence `students.id`, avec la
+  même sémantique.
 * `offers.company_id` référence `companies.id`.
 * `offers.priority_contact_id` référence `company_contacts.id`.
 * `offers.submitted_by_student_id` référence `students.id`.
@@ -102,6 +110,17 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
 * `offers.status` est limité à `soumise`, `validee_et_visible`, `prise`,
   `non_disponible` et `refusee`.
 * `offers.source_type` est limité à `company` ou `student`.
+* `companies.validation_status` et `company_contacts.validation_status` sont
+  limités à `pending` ou `validated` (défaut `validated`, pour que les bases
+  existantes et les seeds restent valides sans modification).
+* `company_contacts.email` est unique dans tout le référentiel, sur
+  `LOWER(TRIM(email))` (`idx_company_contacts_email_norm`), quel que soit le
+  statut de validation.
+* Le couple `(companies.name, companies.address)` est unique sur
+  `LOWER(TRIM(name))` + `LOWER(TRIM(COALESCE(address, '')))`
+  (`idx_companies_name_address_norm`) : une adresse nulle, vide ou composée
+  uniquement d'espaces représente la même valeur absente. Le nom seul,
+  l'adresse seule et l'email général ne sont pas des clés uniques.
 * Les clés étrangères sont activées à la connexion.
 
 ## Limites et questions ouvertes
@@ -112,6 +131,12 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
   après les migrations de colonnes dont ils dépendent (voir
   `normalizeStudentEmails()` dans `db.migrate.ts` pour la résolution des
   doublons de casse avant contrainte).
+* Contrairement à `normalizeStudentEmails()`, les index uniques de
+  `companies`/`company_contacts` ne résolvent jamais un conflit historique
+  automatiquement : `enforceCompanyAndContactUniqueness()` audite la base
+  avant de créer ces index et fait échouer le démarrage (avec les
+  identifiants en conflit) si un doublon exact existe déjà, sans supprimer ni
+  fusionner de données.
 * La migration future vers PostgreSQL n'est pas définie.
 * Le statut `refusee` existe dans le schéma, mais reste à confirmer comme statut
   produit officiel.

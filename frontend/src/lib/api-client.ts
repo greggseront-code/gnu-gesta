@@ -1,6 +1,23 @@
 const API_BASE = '/api';
 const MUTATING_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 
+/**
+ * Porte le corps JSON complet de la réponse d'erreur (ex: `offer_ids` d'un
+ * 409 de dépendance bloquante), en plus du message lisible sur `.message`.
+ * Reste un Error standard pour ne pas casser les `catch` existants.
+ */
+export class ApiError extends Error {
+  status: number;
+  body: unknown;
+
+  constructor(message: string, status: number, body: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
 let csrfToken: string | null = null;
 let unauthorizedHandler: (() => void) | null = null;
 
@@ -38,7 +55,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error ?? `${res.status} ${res.statusText}`);
+    throw new ApiError((body as { error?: string }).error ?? `${res.status} ${res.statusText}`, res.status, body);
   }
   // 204 (logout, fin d'incarnation) n'a pas de corps : res.json() lèverait
   // une erreur de parsing JSON sur une chaîne vide.

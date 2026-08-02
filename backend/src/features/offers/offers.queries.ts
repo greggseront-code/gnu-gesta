@@ -11,17 +11,19 @@ interface InsertOfferFields extends OfferInput {
   submitted_by_student_id?: number | null;
   created_by_company_id?: number | null;
   source_type?: OfferSourceType | null;
+  status: OfferStatus;
 }
 
+/** Insere l'offre et, si elle demarre hors 'soumise' (creation gestionnaire directement publiee), historise la transition initiale. */
 export function insertOffer(db: Database, fields: InsertOfferFields): Offer {
-  return db
+  const offer = db
     .prepare(
       `INSERT INTO offers
          (company_id, priority_contact_id, description, location, technologies, objectives,
-          remote_allowed, remote_percentage, remarks, submitted_by_student_id, created_by_company_id, source_type)
+          remote_allowed, remote_percentage, remarks, submitted_by_student_id, created_by_company_id, source_type, status)
        VALUES
          (@company_id, @priority_contact_id, @description, @location, @technologies, @objectives,
-          @remote_allowed, @remote_percentage, @remarks, @submitted_by_student_id, @created_by_company_id, @source_type)
+          @remote_allowed, @remote_percentage, @remarks, @submitted_by_student_id, @created_by_company_id, @source_type, @status)
        RETURNING *`,
     )
     .get({
@@ -37,7 +39,20 @@ export function insertOffer(db: Database, fields: InsertOfferFields): Offer {
       submitted_by_student_id: fields.submitted_by_student_id ?? null,
       created_by_company_id: fields.created_by_company_id ?? null,
       source_type: fields.source_type ?? null,
+      status: fields.status,
     }) as Offer;
+
+  if (fields.status !== 'soumise') {
+    db.prepare(`INSERT INTO offer_status_history (offer_id, from_status, to_status) VALUES (?, NULL, ?)`).run(offer.id, fields.status);
+  }
+
+  return offer;
+}
+
+export function findLinkedContactIds(db: Database, offerId: number): number[] {
+  return (db.prepare('SELECT contact_id FROM offer_contacts WHERE offer_id = ?').all(offerId) as { contact_id: number }[]).map(
+    (r) => r.contact_id,
+  );
 }
 
 export function linkOfferContacts(db: Database, offerId: number, contactIds: number[]): void {
@@ -54,9 +69,17 @@ export function listOffers(db: Database, auth: AuthContext, search?: string): Of
     : '';
   const sp = search ? `%${search.toLowerCase()}%` : undefined;
 
-  if (role === 'gestionnaire' || role === 'lecteur') {
+  if (role === 'gestionnaire') {
     return db
       .prepare(`SELECT * FROM offers WHERE 1=1 ${searchClause} ORDER BY created_at DESC`)
+      .all(sp ? { search: sp } : {}) as Offer[];
+  }
+
+  // Le lecteur n'accede pas aux offres 'soumise' (en attente de validation),
+  // seulement aux statuts deja traites par le gestionnaire.
+  if (role === 'lecteur') {
+    return db
+      .prepare(`SELECT * FROM offers WHERE status != 'soumise' ${searchClause} ORDER BY created_at DESC`)
       .all(sp ? { search: sp } : {}) as Offer[];
   }
 
@@ -153,10 +176,28 @@ export function updateOffer(
     }) as Offer;
 }
 
-export function updateOfferCompany(db: Database, id: number, companyId: number): Offer {
-  return db
-    .prepare(`UPDATE offers SET company_id = ?, updated_at = datetime('now') WHERE id = ? RETURNING *`)
-    .get(companyId, id) as Offer;
+/**
+ * Remplace atomiquement l'entreprise, le contact prioritaire et l'ensemble
+ * des contacts associes. Remplace entierement offer_contacts (pas de merge)
+ * pour ne jamais laisser un contact de l'ancienne entreprise rattache.
+ */
+export function replaceOfferAssignment(
+  db: Database,
+  id: number,
+  fields: { company_id: number; priority_contact_id: number; contact_ids: number[] },
+): Offer {
+  return db.transaction(() => {
+    db.prepare(
+      `UPDATE offers SET company_id = @company_id, priority_contact_id = @priority_contact_id, updated_at = datetime('now')
+       WHERE id = @id`,
+    ).run({ id, company_id: fields.company_id, priority_contact_id: fields.priority_contact_id });
+
+    db.prepare('DELETE FROM offer_contacts WHERE offer_id = ?').run(id);
+    const insertLink = db.prepare('INSERT INTO offer_contacts (offer_id, contact_id) VALUES (?, ?)');
+    for (const contactId of fields.contact_ids) insertLink.run(id, contactId);
+
+    return findOfferById(db, id)!;
+  })();
 }
 
 export function updateOfferAttachment(db: Database, id: number, attachmentPath: string): Offer {

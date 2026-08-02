@@ -1,26 +1,43 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { listPedagogicalOffers, validateOffer, rejectOffer, markUnavailable, changeOfferCompany } from '../features/offers/offers.api';
-import type { Offer } from '../features/offers/offers.types';
+import { useState, useEffect, useCallback } from 'react';
+import { Link, Navigate } from 'react-router-dom';
+import {
+  listPedagogicalOffers,
+  validateOffer,
+  rejectOffer,
+  markUnavailable,
+  getOfferDependencies,
+  reassignOffer,
+} from '../features/offers/offers.api';
+import type { Offer, OfferDependencyStatus } from '../features/offers/offers.types';
 import { StatusBadge } from '../components/status-badge';
-import { listCompanies } from '../features/companies/companies.api';
-import type { Company } from '../features/companies/companies.types';
+import { listCompanies, getCompany } from '../features/companies/companies.api';
+import type { Company, CompanyContact } from '../features/companies/companies.types';
 import { useAuth } from '../context/auth-context';
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 export function AdminOffersPage() {
   const { role } = useAuth();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [companies, setCompanies] = useState<Map<number, string>>(new Map());
+  const [dependencies, setDependencies] = useState<Map<number, OfferDependencyStatus>>(new Map());
   const [loading, setLoading] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Company correction state per offer
-  const [correctingOfferId, setCorrectingOfferId] = useState<number | null>(null);
+  // Réaffectation atomique (entreprise + contact prioritaire + contacts associés)
+  const [reassigningOfferId, setReassigningOfferId] = useState<number | null>(null);
   const [companySearch, setCompanySearch] = useState('');
   const [companyResults, setCompanyResults] = useState<Company[]>([]);
   const [companySearchDone, setCompanySearchDone] = useState(false);
+  const [assignmentCompany, setAssignmentCompany] = useState<Company | null>(null);
+  const [assignmentContacts, setAssignmentContacts] = useState<CompanyContact[]>([]);
+  const [selectedContactIds, setSelectedContactIds] = useState<number[]>([]);
+  const [priorityContactId, setPriorityContactId] = useState<number | null>(null);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const [fetchedOffers, fetchedCompanies] = await Promise.all([
         listPedagogicalOffers(),
@@ -30,14 +47,33 @@ export function AdminOffersPage() {
       const map = new Map<number, string>();
       fetchedCompanies.forEach((c) => map.set(c.id, c.name));
       setCompanies(map);
+
+      const pending = fetchedOffers.filter((o) => o.status === 'soumise');
+      const deps = await Promise.all(pending.map((o) => getOfferDependencies(o.id).then((d) => [o.id, d] as const)));
+      setDependencies(new Map(deps));
     } catch (err) {
-      setActionError(String(err));
+      setActionError(errorMessage(err));
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (role === 'gestionnaire') load();
+  }, [role, load]);
+
+  if (role !== 'gestionnaire') {
+    return <Navigate to="/" replace />;
   }
 
-  useEffect(() => { load(); }, []);
+  async function refreshDependency(offerId: number) {
+    try {
+      const status = await getOfferDependencies(offerId);
+      setDependencies((prev) => new Map(prev).set(offerId, status));
+    } catch {
+      // best effort : l'affichage des dépendances n'est qu'indicatif
+    }
+  }
 
   async function handleValidate(offerId: number) {
     setActionError(null);
@@ -45,7 +81,7 @@ export function AdminOffersPage() {
       const updated = await validateOffer(offerId);
       setOffers((prev) => prev.map((o) => o.id === offerId ? updated : o));
     } catch (err) {
-      setActionError(String(err));
+      setActionError(errorMessage(err));
     }
   }
 
@@ -55,7 +91,7 @@ export function AdminOffersPage() {
       const updated = await rejectOffer(offerId);
       setOffers((prev) => prev.map((o) => o.id === offerId ? updated : o));
     } catch (err) {
-      setActionError(String(err));
+      setActionError(errorMessage(err));
     }
   }
 
@@ -65,53 +101,82 @@ export function AdminOffersPage() {
       const updated = await markUnavailable(offerId);
       setOffers((prev) => prev.map((o) => o.id === offerId ? updated : o));
     } catch (err) {
-      setActionError(String(err));
+      setActionError(errorMessage(err));
     }
   }
 
-  function startCorrectCompany(offerId: number) {
-    setCorrectingOfferId(offerId);
+  function startReassign(offerId: number) {
+    setReassigningOfferId(offerId);
     setCompanySearch('');
     setCompanyResults([]);
     setCompanySearchDone(false);
+    setAssignmentCompany(null);
+    setAssignmentContacts([]);
+    setSelectedContactIds([]);
+    setPriorityContactId(null);
+    setAssignmentError(null);
   }
 
-  function cancelCorrectCompany() {
-    setCorrectingOfferId(null);
-    setCompanySearch('');
-    setCompanyResults([]);
-    setCompanySearchDone(false);
+  function cancelReassign() {
+    setReassigningOfferId(null);
   }
 
   async function handleCompanySearch(e: React.FormEvent) {
     e.preventDefault();
     try {
       const results = await listCompanies(companySearch || undefined);
-      setCompanyResults(results);
+      // Une réaffectation exige une entreprise déjà validée.
+      setCompanyResults(results.filter((c) => c.validation_status === 'validated'));
       setCompanySearchDone(true);
     } catch (err) {
-      setActionError(String(err));
+      setAssignmentError(errorMessage(err));
     }
   }
 
-  async function handleSelectNewCompany(offerId: number, companyId: number) {
-    setActionError(null);
+  async function handleSelectAssignmentCompany(c: Company) {
+    setAssignmentError(null);
     try {
-      const updated = await changeOfferCompany(offerId, companyId);
-      setOffers((prev) => prev.map((o) => o.id === offerId ? updated : o));
-      cancelCorrectCompany();
+      const full = await getCompany(c.id);
+      setAssignmentCompany(c);
+      const validContacts = full.contacts.filter((contact) => contact.validation_status === 'validated');
+      setAssignmentContacts(validContacts);
+      setSelectedContactIds([]);
+      setPriorityContactId(null);
     } catch (err) {
-      setActionError(String(err));
+      setAssignmentError(errorMessage(err));
     }
   }
 
-  if (role !== 'gestionnaire' && role !== 'lecteur') {
-    return (
-      <div className="alert alert-error">Accès réservé aux gestionnaires et lecteurs.</div>
-    );
+  function toggleAssignmentContact(contactId: number) {
+    setSelectedContactIds((prev) => {
+      const next = prev.includes(contactId) ? prev.filter((id) => id !== contactId) : [...prev, contactId];
+      if (!next.includes(priorityContactId ?? -1)) {
+        setPriorityContactId(next[0] ?? null);
+      }
+      return next;
+    });
   }
 
-  const isReadOnly = role === 'lecteur';
+  async function handleConfirmReassign(offerId: number) {
+    setAssignmentError(null);
+    if (!assignmentCompany || priorityContactId == null || selectedContactIds.length === 0) {
+      setAssignmentError('Sélectionnez une entreprise, un contact prioritaire et au moins un contact.');
+      return;
+    }
+    try {
+      const updated = await reassignOffer(offerId, {
+        company_id: assignmentCompany.id,
+        priority_contact_id: priorityContactId,
+        contact_ids: selectedContactIds,
+      });
+      setOffers((prev) => prev.map((o) => o.id === offerId ? updated : o));
+      setCompanies((prev) => new Map(prev).set(assignmentCompany.id, assignmentCompany.name));
+      await refreshDependency(offerId);
+      setReassigningOfferId(null);
+    } catch (err) {
+      setAssignmentError(errorMessage(err));
+    }
+  }
 
   if (loading) return <p className="text-muted">Chargement…</p>;
 
@@ -135,7 +200,9 @@ export function AdminOffersPage() {
         <div className="stack">
           {offers.map((offer) => {
             const companyName = companies.get(offer.company_id) ?? `Entreprise #${offer.company_id}`;
-            const isCorrecting = correctingOfferId === offer.id;
+            const isReassigning = reassigningOfferId === offer.id;
+            const deps = dependencies.get(offer.id);
+            const hasBlockers = Boolean(deps && (deps.company_pending || deps.pending_contact_ids.length > 0));
 
             return (
               <div key={offer.id} className="card">
@@ -157,104 +224,185 @@ export function AdminOffersPage() {
                           ? offer.description.slice(0, 200) + '…'
                           : offer.description}
                       </p>
+
+                      {offer.status === 'soumise' && hasBlockers && deps && (
+                        <div className="alert alert-warning" style={{ marginBottom: '0.5rem', fontSize: '0.8125rem' }}>
+                          Dépendance en attente :{' '}
+                          {deps.company_pending && (
+                            <Link to="/admin/companies#pending-companies">l'entreprise</Link>
+                          )}
+                          {deps.company_pending && deps.pending_contact_ids.length > 0 && ' et '}
+                          {deps.pending_contact_ids.length > 0 && (
+                            <Link to="/admin/companies#pending-contacts">
+                              {deps.pending_contact_ids.length} contact{deps.pending_contact_ids.length > 1 ? 's' : ''}
+                            </Link>
+                          )}
+                          {' '}doivent être validés avant de pouvoir publier cette offre.
+                        </div>
+                      )}
                     </div>
                     <div style={{ flexShrink: 0 }}>
                       <StatusBadge status={offer.status} />
                     </div>
                   </div>
 
-                  {!isReadOnly && (
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-                      {offer.status === 'soumise' && (
-                        <>
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => handleValidate(offer.id)}
-                          >
-                            Valider
-                          </button>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => handleReject(offer.id)}
-                          >
-                            Refuser
-                          </button>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => handleMarkUnavailable(offer.id)}
-                          >
-                            Indisponible
-                          </button>
-                        </>
-                      )}
-                      {offer.source_type === 'student' && (
-                        !isCorrecting ? (
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => startCorrectCompany(offer.id)}
-                          >
-                            Corriger l'entreprise
-                          </button>
-                        ) : (
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={cancelCorrectCompany}
-                          >
-                            Annuler
-                          </button>
-                        )
-                      )}
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+                    {offer.status === 'soumise' && (
+                      <>
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => handleValidate(offer.id)}
+                          disabled={hasBlockers}
+                          title={hasBlockers ? 'Validez d\'abord les dépendances en attente.' : undefined}
+                        >
+                          Valider
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleReject(offer.id)}
+                        >
+                          Refuser
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleMarkUnavailable(offer.id)}
+                        >
+                          Indisponible
+                        </button>
+                      </>
+                    )}
+                    {!isReassigning ? (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => startReassign(offer.id)}
+                      >
+                        Réaffecter l'entreprise et les contacts
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={cancelReassign}
+                      >
+                        Annuler
+                      </button>
+                    )}
+                  </div>
 
-                  {isCorrecting && (
+                  {isReassigning && (
                     <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'var(--color-bg)', borderRadius: 'var(--radius)', border: '1px solid var(--color-border)' }}>
                       <p style={{ marginBottom: '0.5rem', fontWeight: 600, fontSize: '0.875rem' }}>
-                        Changer l'entreprise
+                        Réaffecter l'entreprise et les contacts (entreprise et contacts validés uniquement)
                       </p>
-                      <form onSubmit={handleCompanySearch} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        <input
-                          className="search-input"
-                          value={companySearch}
-                          onChange={(e) => setCompanySearch(e.target.value)}
-                          placeholder="Rechercher une entreprise…"
-                          style={{ flex: 1 }}
-                        />
-                        <button type="submit" className="btn btn-primary btn-sm">Rechercher</button>
-                      </form>
 
-                      {companySearchDone && companyResults.length === 0 && (
-                        <p className="text-muted" style={{ fontSize: '0.875rem' }}>Aucune entreprise trouvée.</p>
-                      )}
+                      {!assignmentCompany ? (
+                        <>
+                          <form onSubmit={handleCompanySearch} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <input
+                              className="search-input"
+                              value={companySearch}
+                              onChange={(e) => setCompanySearch(e.target.value)}
+                              placeholder="Rechercher une entreprise validée…"
+                              style={{ flex: 1 }}
+                            />
+                            <button type="submit" className="btn btn-primary btn-sm">Rechercher</button>
+                          </form>
 
-                      {companyResults.length > 0 && (
-                        <div className="table-wrapper">
-                          <table className="table">
-                            <thead>
-                              <tr>
-                                <th>Nom</th>
-                                <th>Email</th>
-                                <th></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {companyResults.map((c) => (
-                                <tr key={c.id}>
-                                  <td>{c.name}</td>
-                                  <td className="text-muted">{c.general_email}</td>
-                                  <td>
-                                    <button
-                                      className="btn btn-primary btn-sm"
-                                      onClick={() => handleSelectNewCompany(offer.id, c.id)}
-                                    >
-                                      Choisir
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                          {companySearchDone && companyResults.length === 0 && (
+                            <p className="text-muted" style={{ fontSize: '0.875rem' }}>Aucune entreprise validée trouvée.</p>
+                          )}
+
+                          {companyResults.length > 0 && (
+                            <div className="table-wrapper">
+                              <table className="table">
+                                <thead>
+                                  <tr>
+                                    <th>Nom</th>
+                                    <th>Email</th>
+                                    <th></th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {companyResults.map((c) => (
+                                    <tr key={c.id}>
+                                      <td>{c.name}</td>
+                                      <td className="text-muted">{c.general_email}</td>
+                                      <td>
+                                        <button
+                                          className="btn btn-primary btn-sm"
+                                          onClick={() => handleSelectAssignmentCompany(c)}
+                                        >
+                                          Choisir
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <p style={{ marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                            Entreprise choisie : <strong>{assignmentCompany.name}</strong>{' '}
+                            <button className="btn btn-secondary btn-sm" onClick={() => setAssignmentCompany(null)}>Changer</button>
+                          </p>
+
+                          {assignmentContacts.length === 0 ? (
+                            <p className="text-muted" style={{ fontSize: '0.875rem' }}>
+                              Cette entreprise n'a aucun contact validé : validez-en un avant de réaffecter cette offre.
+                            </p>
+                          ) : (
+                            <div className="table-wrapper">
+                              <table className="table">
+                                <thead>
+                                  <tr>
+                                    <th>Inclure</th>
+                                    <th>Prioritaire</th>
+                                    <th>Nom</th>
+                                    <th>Email</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {assignmentContacts.map((contact) => (
+                                    <tr key={contact.id}>
+                                      <td>
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedContactIds.includes(contact.id)}
+                                          onChange={() => toggleAssignmentContact(contact.id)}
+                                        />
+                                      </td>
+                                      <td>
+                                        <input
+                                          type="radio"
+                                          name={`priority-${offer.id}`}
+                                          checked={priorityContactId === contact.id}
+                                          disabled={!selectedContactIds.includes(contact.id)}
+                                          onChange={() => setPriorityContactId(contact.id)}
+                                        />
+                                      </td>
+                                      <td>{contact.first_name} {contact.last_name}</td>
+                                      <td className="text-muted">{contact.email}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {assignmentError && <div className="alert alert-error" style={{ marginTop: '0.5rem' }}>{assignmentError}</div>}
+
+                          <div className="form-actions" style={{ marginTop: '0.5rem' }}>
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => handleConfirmReassign(offer.id)}
+                              disabled={selectedContactIds.length === 0 || priorityContactId == null}
+                            >
+                              Confirmer la réaffectation
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
                   )}

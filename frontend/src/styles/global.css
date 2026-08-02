@@ -517,6 +517,12 @@ a:hover {
   color: #991b1b;
 }
 
+.alert-info {
+  background: var(--color-primary-light);
+  border-color: #a5b4fc;
+  color: var(--color-primary-hover);
+}
+
 /* ===================== CONTACT LIST ===================== */
 
 .contact-list {

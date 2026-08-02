@@ -41,3 +41,14 @@ export interface OfferInput {
   remote_percentage?: number;
   remarks?: string;
 }
+
+export interface OfferAssignmentInput {
+  company_id: number;
+  priority_contact_id: number;
+  contact_ids: number[];
+}
+
+export interface OfferDependencyStatus {
+  company_pending: boolean;
+  pending_contact_ids: number[];
+}

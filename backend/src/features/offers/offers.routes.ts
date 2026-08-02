@@ -1,26 +1,38 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { requireRole } from '../../middlewares/authorization.middleware';
 import { upload } from '../../middlewares/upload.middleware';
-import { OfferInputSchema, PatchOfferSchema, PatchOfferCompanySchema } from './offers.schemas';
+import { OfferInputSchema, PatchOfferSchema, OfferAssignmentSchema } from './offers.schemas';
 import {
   createOffer,
   getOffers,
   getOfferById,
+  getOfferDependencyStatus,
   validateOffer,
   rejectOffer,
   closeOffer,
   editOffer,
-  changeOfferCompany,
+  reassignOffer,
   attachFile,
 } from './offers.service';
 import { getApplicationByStudentAndOffer } from '../applications/applications.service';
+import { HttpError } from '../../lib/http-errors';
 import type { Offer } from './offers.types';
 
 export const offersRouter = Router();
 
+function handleServiceError(err: unknown, res: Response): void {
+  if (err instanceof HttpError) {
+    res.status(err.status).json({ error: err.message, ...(err.details ? (err.details as object) : {}) });
+    return;
+  }
+  throw err;
+}
+
 function isVisible(offer: Offer, auth: { role: string | null; entityId: number | null }): boolean {
   const { role, entityId } = auth;
-  if (role === 'gestionnaire' || role === 'lecteur') return true;
+  if (role === 'gestionnaire') return true;
+  // Le lecteur n'a pas accès aux offres encore soumises (en attente de validation).
+  if (role === 'lecteur') return offer.status !== 'soumise';
   if (role === 'etudiant') return offer.status === 'validee_et_visible' || offer.submitted_by_student_id === entityId;
   if (role === 'entreprise') return offer.company_id === entityId;
   // Inatteignable derriere requireRole() sur les deux routes GET (jalon 4) :
@@ -46,7 +58,11 @@ offersRouter.get('/', requireRole('gestionnaire', 'lecteur', 'etudiant', 'entrep
 offersRouter.post('/', requireRole('gestionnaire', 'etudiant', 'entreprise'), (req, res) => {
   const result = OfferInputSchema.safeParse(req.body);
   if (!result.success) { res.status(400).json({ error: result.error.flatten() }); return; }
-  res.status(201).json(createOffer(result.data, req.auth));
+  try {
+    res.status(201).json(createOffer(result.data, req.auth));
+  } catch (err) {
+    handleServiceError(err, res);
+  }
 });
 
 // GET /:id — scoped visibility
@@ -67,11 +83,20 @@ offersRouter.get('/:id', requireRole('gestionnaire', 'lecteur', 'etudiant', 'ent
   res.json(offer);
 });
 
+// GET /:id/dependencies — gestionnaire only : entreprise/contacts encore en attente pour cette offre.
+offersRouter.get('/:id/dependencies', requireRole('gestionnaire'), (req, res) => {
+  const status = getOfferDependencyStatus(Number(req.params.id));
+  if (!status) { res.status(404).json({ error: 'Offre non trouvée' }); return; }
+  res.json(status);
+});
+
 // POST /:id/validate — gestionnaire only
 offersRouter.post('/:id/validate', requireRole('gestionnaire'), (req, res) => {
-  const offer = getOfferById(Number(req.params.id));
-  if (!offer) { res.status(404).json({ error: 'Offre non trouvée' }); return; }
-  res.json(validateOffer(Number(req.params.id)));
+  try {
+    res.json(validateOffer(Number(req.params.id)));
+  } catch (err) {
+    handleServiceError(err, res);
+  }
 });
 
 // POST /:id/reject — gestionnaire only
@@ -98,13 +123,17 @@ offersRouter.patch('/:id', requireRole('gestionnaire', 'entreprise', 'etudiant')
   res.json(editOffer(Number(req.params.id), result.data));
 });
 
-// PATCH /:id/company — gestionnaire only
-offersRouter.patch('/:id/company', requireRole('gestionnaire'), (req, res) => {
-  const offer = getOfferById(Number(req.params.id));
-  if (!offer) { res.status(404).json({ error: 'Offre non trouvée' }); return; }
-  const result = PatchOfferCompanySchema.safeParse(req.body);
+// PATCH /:id/assignment — gestionnaire only. Remplace atomiquement
+// l'entreprise, le contact prioritaire et les contacts associés ; n'accepte
+// qu'une entreprise et des contacts déjà validés.
+offersRouter.patch('/:id/assignment', requireRole('gestionnaire'), (req, res) => {
+  const result = OfferAssignmentSchema.safeParse(req.body);
   if (!result.success) { res.status(400).json({ error: result.error.flatten() }); return; }
-  res.json(changeOfferCompany(Number(req.params.id), result.data.company_id));
+  try {
+    res.json(reassignOffer(Number(req.params.id), result.data));
+  } catch (err) {
+    handleServiceError(err, res);
+  }
 });
 
 // POST /:id/attachment — gestionnaire/entreprise(own)/etudiant(own)

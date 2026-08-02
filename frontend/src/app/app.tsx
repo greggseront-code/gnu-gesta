@@ -12,6 +12,7 @@ import { OfferDetailsPage } from '../pages/offer-details.page';
 import { SubmitOfferPage } from '../pages/submit-offer.page';
 import { StudentProposalPage } from '../pages/student-proposal.page';
 import { AdminOffersPage } from '../pages/admin-offers.page';
+import { AdminCompaniesPage } from '../pages/admin-companies.page';
 import { AdminCompanyFormPage } from '../pages/admin-company-form.page';
 import { AdminCompanyDetailPage } from '../pages/admin-company-detail.page';
 import { StudentsPage } from '../pages/students.page';
@@ -41,6 +42,17 @@ function RequireGestionnaireBase({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Rôle effectif (pas baseRole) : une incarnation gestionnaire prend le rôle
+ * etudiant/entreprise et doit donc rester bloquée hors des écrans de
+ * validation, contrairement à RequireGestionnaireBase (voir spec).
+ */
+function RequireGestionnaireRole({ children }: { children: ReactNode }) {
+  const { role } = useAuth();
+  if (role !== 'gestionnaire') return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -63,8 +75,30 @@ function AppRoutes() {
         <Route path="offers/proposal" element={<RequireWrite><StudentProposalPage /></RequireWrite>} />
         <Route path="offers/:id/edit" element={<RequireWrite><SubmitOfferPage /></RequireWrite>} />
         <Route path="offers/:id" element={<OfferDetailsPage />} />
-        <Route path="admin/offers" element={<AdminOffersPage />} />
-        <Route path="admin/companies/new" element={<RequireWrite><AdminCompanyFormPage /></RequireWrite>} />
+        <Route
+          path="admin/offers"
+          element={
+            <RequireGestionnaireRole>
+              <AdminOffersPage />
+            </RequireGestionnaireRole>
+          }
+        />
+        <Route
+          path="admin/companies"
+          element={
+            <RequireGestionnaireRole>
+              <AdminCompaniesPage />
+            </RequireGestionnaireRole>
+          }
+        />
+        <Route
+          path="admin/companies/new"
+          element={
+            <RequireGestionnaireRole>
+              <AdminCompanyFormPage />
+            </RequireGestionnaireRole>
+          }
+        />
         <Route path="admin/companies/:id" element={<AdminCompanyDetailPage />} />
         <Route path="admin/students" element={<StudentsPage />} />
         <Route path="admin/students/import" element={<RequireWrite><StudentsImportPage /></RequireWrite>} />

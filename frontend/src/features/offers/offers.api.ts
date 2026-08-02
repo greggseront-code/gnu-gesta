@@ -1,5 +1,5 @@
 import { apiFetch, getCsrfToken } from '../../lib/api-client';
-import type { Offer, OfferInput } from './offers.types';
+import type { Offer, OfferAssignmentInput, OfferDependencyStatus, OfferInput } from './offers.types';
 
 export function listVisibleOffers(search?: string): Promise<Offer[]> {
   const qs = search ? `?search=${encodeURIComponent(search)}` : '';
@@ -49,10 +49,14 @@ export function updateOffer(id: number, input: Partial<OfferInput>): Promise<Off
   });
 }
 
-export function changeOfferCompany(id: number, companyId: number): Promise<Offer> {
-  return apiFetch<Offer>(`/offers/${id}/company`, {
+export function getOfferDependencies(id: number): Promise<OfferDependencyStatus> {
+  return apiFetch<OfferDependencyStatus>(`/offers/${id}/dependencies`);
+}
+
+export function reassignOffer(id: number, input: OfferAssignmentInput): Promise<Offer> {
+  return apiFetch<Offer>(`/offers/${id}/assignment`, {
     method: 'PATCH',
-    body: JSON.stringify({ company_id: companyId }),
+    body: JSON.stringify(input),
   });
 }
 

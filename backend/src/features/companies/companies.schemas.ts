@@ -20,3 +20,6 @@ export const CompanyInputSchema = z.object({
   address: z.string().optional(),
   contacts: z.array(ContactInputSchema).min(1, 'Au moins un contact est requis'),
 });
+
+/** Modification gestionnaire d'un contact en attente ou déjà validé : mêmes contraintes que la création, tous champs optionnels. */
+export const ContactPatchSchema = ContactInputSchema.partial();

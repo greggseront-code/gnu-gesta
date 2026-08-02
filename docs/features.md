@@ -134,40 +134,75 @@ tester les parcours métier.
 
 Maintenir le référentiel des entreprises et de leurs contacts pour permettre le
 dépôt d'offres, les propositions étudiantes et la consultation par les
-étudiants.
+étudiants, tout en modérant les entreprises et contacts proposés par les
+étudiants avant qu'ils n'enrichissent le référentiel partagé.
 
 ### Parcours utilisateur
 
 * Un utilisateur consulte ou recherche une entreprise.
-* Un gestionnaire, un étudiant ou une entreprise crée une entreprise si besoin.
-* Un gestionnaire ou l'entreprise propriétaire complète la fiche et les contacts.
-* Les étudiants utilisent le référentiel pour rattacher une proposition à une
-  entreprise existante quand c'est possible.
+* Un étudiant doit d'abord rechercher une entreprise (message anti-doublon,
+  formulaire de création indisponible avant la recherche) avant de pouvoir en
+  proposer une nouvelle avec son premier contact ; l'ensemble part `pending`
+  mais reste immédiatement utilisable par l'étudiant créateur pour sa
+  proposition de stage.
+* De la même façon, un étudiant recherche d'abord les contacts d'une
+  entreprise existante avant de pouvoir en proposer un nouveau (`pending`).
+* Un gestionnaire crée directement une entreprise ou un contact validé
+  depuis `/admin/companies/new` ou l'écran de détail.
+* L'entreprise propriétaire ajoute un contact directement validé à sa propre
+  fiche.
+* Le gestionnaire contrôle les soumissions en attente depuis
+  `/admin/companies` (ou l'écran de détail) : modification, acceptation
+  (atomique entreprise + premier contact), refus (bloqué si l'élément est
+  encore référencé par une offre).
 
 ### Règles principales
 
 * Une entreprise contient un nom, un email général et une adresse optionnelle.
 * Une entreprise doit avoir au moins un contact à la création.
 * Les contacts portent un ou plusieurs rôles.
-* Les entreprises peuvent être recherchées pour limiter les doublons.
+* Une entreprise ou un contact créé par un étudiant est `pending` ; par le
+  gestionnaire ou par l'entreprise propriétaire (pour ses propres contacts),
+  il est `validated` immédiatement.
+* Un élément `pending` est visible par le gestionnaire et son créateur
+  uniquement ; masqué (comme absent, `404`) pour tout autre rôle, y compris
+  un autre étudiant.
+* L'email d'un contact et le couple nom/adresse d'une entreprise sont uniques
+  dans tout le référentiel, casse et espaces ignorés ; une violation retourne
+  `409`.
+* Une entreprise ou un contact référencé par une offre ne peut pas être
+  refusé (supprimé).
 * Une entreprise ne modifie que sa propre fiche, sauf gestionnaire.
 
 ### Contrat front/back
 
-* `GET /api/companies` : lister ou rechercher les entreprises.
+* `GET /api/companies` : lister ou rechercher les entreprises visibles.
 * `GET /api/companies?duplicate_risk=true` : lister les risques de doublon.
-* `GET /api/companies/:id` : lire une entreprise avec ses contacts.
-* `POST /api/companies` : créer une entreprise.
+* `GET /api/companies/pending` : file de modération gestionnaire (entreprises
+  et contacts en attente).
+* `GET /api/companies/:id` : lire une entreprise avec ses contacts visibles.
+* `POST /api/companies` : créer une entreprise (gestionnaire, étudiant).
+* `POST /api/companies/:id/validate` : valider une entreprise (et ses
+  contacts initiaux).
+* `DELETE /api/companies/:id` : refuser (supprimer) une soumission d'entreprise.
 * `PATCH /api/companies/:id` : modifier une entreprise.
 * `POST /api/companies/:id/contacts` : ajouter un contact.
+* `POST /api/companies/contacts/:contactId/validate` : valider un contact
+  ajouté ultérieurement.
+* `PATCH /api/companies/contacts/:contactId` : modifier un contact.
+* `DELETE /api/companies/contacts/:contactId` : refuser (supprimer) une
+  soumission de contact.
 * Types frontend principaux : `Company`, `CompanyContact`,
-  `CompanyWithContacts`, `CompanyInput`, `ContactInput`.
+  `CompanyWithContacts`, `CompanyInput`, `ContactInput`, `ContactPatchInput`,
+  `PendingCompany`, `PendingContact`, `PendingQueue`.
 
 ### Pages frontend concernées
 
 * `frontend/src/pages/companies.page.tsx`
-* `frontend/src/pages/admin-company-form.page.tsx`
+* `frontend/src/pages/admin-company-form.page.tsx` (gestionnaire uniquement)
 * `frontend/src/pages/admin-company-detail.page.tsx`
+* `frontend/src/pages/admin-companies.page.tsx` (file de modération,
+  gestionnaire uniquement)
 * `frontend/src/pages/company-dashboard.page.tsx`
 * `frontend/src/pages/impersonation-select.page.tsx`
 * `frontend/src/pages/student-proposal.page.tsx`
@@ -184,11 +219,14 @@ dépôt d'offres, les propositions étudiantes et la consultation par les
 
 ### Cas limites
 
-* La détection de doublons est approximative.
+* La détection de doublons probables est approximative (elle limite les
+  doublons approchants ; les index uniques empêchent les doublons exacts).
 * `GET /api/companies` exige une session authentifiée (n'importe quel rôle) ;
   utilisé comme référentiel de recherche par plusieurs écrans (admin offres,
   admin candidatures, accueil, proposition de stage étudiante).
 * Les rôles de contacts sont stockés sous forme JSON texte côté SQLite.
+* Aucun historique des soumissions refusées n'est conservé : un refus
+  confirmé est irrécupérable.
 
 ## Offers
 
@@ -200,16 +238,32 @@ des propositions étudiantes.
 ### Parcours utilisateur
 
 * Une entreprise dépose une offre.
-* Un étudiant peut proposer un stage en rattachant une entreprise.
-* Un gestionnaire valide, refuse ou rend une offre indisponible.
+* Un étudiant peut proposer un stage : recherche obligatoire d'une entreprise
+  (puis, le cas échéant, de ses contacts) avant de pouvoir en proposer une
+  nouvelle, avec message anti-doublon avant chaque recherche.
+* Un gestionnaire valide, refuse ou rend une offre indisponible ;
+  `/admin/offers` signale les dépendances (entreprise/contacts) encore en
+  attente et désactive la validation tant qu'elles ne sont pas levées, avec
+  un lien vers `/admin/companies`.
+* Le gestionnaire peut réaffecter atomiquement l'entreprise, le contact
+  prioritaire et les contacts associés d'une offre vers des éléments déjà
+  validés.
 * Les étudiants consultent les offres visibles et peuvent postuler.
 * Une entreprise suit ses offres et les candidatures associées.
 
 ### Règles principales
 
 * Une offre est rattachée à une entreprise.
-* Une offre a un contact prioritaire et une liste de contacts.
-* Les offres validées deviennent visibles aux étudiants.
+* Une offre a un contact prioritaire et une liste de contacts ; le contact
+  prioritaire doit figurer dans la liste, et chaque contact doit appartenir à
+  l'entreprise choisie et être visible pour l'auteur.
+* Une offre créée par le gestionnaire est directement `validee_et_visible` ;
+  une création étudiante ou entreprise reste `soumise`.
+* Une offre ne peut devenir `validee_et_visible` que si son entreprise, son
+  contact prioritaire et tous ses contacts associés sont validés ; sinon la
+  validation (ou la création gestionnaire) est bloquée (`409`).
+* Le lecteur ne voit pas les offres `soumise` et n'a pas accès aux écrans de
+  validation.
 * Les offres `prise` ou `non_disponible` ne sont plus ouvertes comme offres
   disponibles.
 * Les gestionnaires pilotent les changements de statut pédagogiques.
@@ -219,14 +273,16 @@ des propositions étudiantes.
 * `GET /api/offers` : lister les offres visibles selon le rôle.
 * `POST /api/offers` : créer une offre ou une proposition.
 * `GET /api/offers/:id` : lire une offre selon les droits.
+* `GET /api/offers/:id/dependencies` : dépendances en attente (gestionnaire).
 * `POST /api/offers/:id/validate` : valider une offre.
 * `POST /api/offers/:id/reject` : refuser une offre.
 * `POST /api/offers/:id/mark-unavailable` : rendre une offre indisponible.
 * `PATCH /api/offers/:id` : modifier une offre.
-* `PATCH /api/offers/:id/company` : changer l'entreprise rattachée.
+* `PATCH /api/offers/:id/assignment` : réaffecter atomiquement l'entreprise,
+  le contact prioritaire et les contacts associés.
 * `POST /api/offers/:id/attachment` : rattacher une pièce jointe.
 * Types frontend principaux : `Offer`, `OfferInput`, `OfferStatus`,
-  `OfferSourceType`.
+  `OfferSourceType`, `OfferAssignmentInput`, `OfferDependencyStatus`.
 
 ### Pages frontend concernées
 
@@ -234,9 +290,11 @@ des propositions étudiantes.
 * `frontend/src/pages/offer-details.page.tsx`
 * `frontend/src/pages/submit-offer.page.tsx`
 * `frontend/src/pages/student-proposal.page.tsx`
-* `frontend/src/pages/admin-offers.page.tsx`
+* `frontend/src/pages/admin-offers.page.tsx` (gestionnaire uniquement)
 * `frontend/src/pages/company-dashboard.page.tsx`
 * `frontend/src/pages/student-applications.page.tsx`
+* `frontend/src/pages/home.page.tsx` (compteur d'offres en attente, tableau de
+  bord gestionnaire)
 
 ### Briques frontend concernées
 
@@ -255,8 +313,9 @@ des propositions étudiantes.
 * Le statut `refusee` existe dans le code, mais reste à confirmer comme statut
   produit officiel.
 * Le cycle de vie des pièces jointes est minimal.
-* La création ne vérifie pas explicitement que les contacts appartiennent à
-  l'entreprise cible.
+* `PATCH /api/offers/:id/company`, qui ne corrigeait que l'entreprise et
+  laissait des contacts orphelins, a été retirée au profit de
+  `PATCH /api/offers/:id/assignment`.
 
 ## Students
 

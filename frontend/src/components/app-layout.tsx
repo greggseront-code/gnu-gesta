@@ -47,7 +47,10 @@ export function AppLayout() {
                 <div className="sidebar-section-title">Répertoire</div>
                 <NavLink to="/companies" className={link}>Entreprises</NavLink>
                 {role === 'gestionnaire' && (
-                  <NavLink to="/admin/companies/new" className={link}>+ Nouvelle entreprise</NavLink>
+                  <>
+                    <NavLink to="/admin/companies/new" className={link}>+ Nouvelle entreprise</NavLink>
+                    <NavLink to="/admin/companies" end className={link}>Admin entreprises</NavLink>
+                  </>
                 )}
               </div>
             )}
@@ -79,7 +82,7 @@ export function AppLayout() {
             <div className="sidebar-section">
               <div className="sidebar-section-title">Stages</div>
               <NavLink to="/offers" end className={link}>Offres</NavLink>
-              {(role === 'gestionnaire' || role === 'lecteur') && (
+              {role === 'gestionnaire' && (
                 <NavLink to="/admin/offers" className={link}>Admin offres</NavLink>
               )}
               {(role === 'gestionnaire' || role === 'lecteur') && (

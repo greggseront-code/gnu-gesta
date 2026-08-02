@@ -36,23 +36,38 @@ CREATE TABLE IF NOT EXISTS students (
   created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+-- validation_status/submitted_by_student_id/validated_at pilotent la file de
+-- moderation etudiante (voir docs/specs/2026-08-02-validation-offres-entreprises-contacts.md).
+-- Les index uniques normalises (email, nom+adresse) sont crees dans
+-- db.migrate.ts, apres l'audit de conflits pre-migration : voir la note en
+-- tete de fichier sur les index portant sur des colonnes ajoutees a une base
+-- existante.
 CREATE TABLE IF NOT EXISTS companies (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  name          TEXT    NOT NULL,
-  address       TEXT,
-  general_email TEXT    NOT NULL,
-  created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+  id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+  name                    TEXT    NOT NULL,
+  address                 TEXT,
+  general_email           TEXT    NOT NULL,
+  validation_status       TEXT    NOT NULL DEFAULT 'validated'
+                            CHECK(validation_status IN ('pending', 'validated')),
+  submitted_by_student_id INTEGER          REFERENCES students(id),
+  validated_at            TEXT,
+  created_at              TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS company_contacts (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  company_id    INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-  first_name    TEXT    NOT NULL,
-  last_name     TEXT    NOT NULL,
-  email         TEXT    NOT NULL,
-  phone         TEXT,
-  roles         TEXT    NOT NULL,
-  created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+  id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+  company_id              INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  first_name              TEXT    NOT NULL,
+  last_name               TEXT    NOT NULL,
+  email                   TEXT    NOT NULL,
+  phone                   TEXT,
+  roles                   TEXT    NOT NULL,
+  validation_status       TEXT    NOT NULL DEFAULT 'validated'
+                            CHECK(validation_status IN ('pending', 'validated')),
+  submitted_by_student_id INTEGER          REFERENCES students(id),
+  created_with_company    INTEGER NOT NULL DEFAULT 0 CHECK(created_with_company IN (0, 1)),
+  validated_at            TEXT,
+  created_at              TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS offers (

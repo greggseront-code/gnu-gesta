@@ -45,7 +45,7 @@ export function AdminCompanyFormPage() {
       }
       navigate(`/admin/companies/${result.id}`);
     } catch (err) {
-      setError(String(err));
+      setError(err instanceof Error ? err.message : String(err));
     }
   }
 

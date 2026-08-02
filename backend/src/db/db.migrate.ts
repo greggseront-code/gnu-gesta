@@ -7,6 +7,8 @@ export function runMigrations(db: Database): void {
   db.exec(schema);
   applyColumnMigrations(db);
   normalizeStudentEmails(db);
+  backfillValidationTimestamps(db);
+  enforceCompanyAndContactUniqueness(db);
 }
 
 export function runSeed(db: Database): void {
@@ -39,6 +41,30 @@ function applyColumnMigrations(db: Database): void {
   // updated_at.
   addColumnIfMissing(db, 'users', 'updated_at', 'TEXT');
 
+  addColumnIfMissing(
+    db,
+    'companies',
+    'validation_status',
+    "TEXT NOT NULL DEFAULT 'validated' CHECK(validation_status IN ('pending', 'validated'))",
+  );
+  addColumnIfMissing(db, 'companies', 'submitted_by_student_id', 'INTEGER REFERENCES students(id)');
+  addColumnIfMissing(db, 'companies', 'validated_at', 'TEXT');
+
+  addColumnIfMissing(
+    db,
+    'company_contacts',
+    'validation_status',
+    "TEXT NOT NULL DEFAULT 'validated' CHECK(validation_status IN ('pending', 'validated'))",
+  );
+  addColumnIfMissing(db, 'company_contacts', 'submitted_by_student_id', 'INTEGER REFERENCES students(id)');
+  addColumnIfMissing(
+    db,
+    'company_contacts',
+    'created_with_company',
+    'INTEGER NOT NULL DEFAULT 0 CHECK(created_with_company IN (0, 1))',
+  );
+  addColumnIfMissing(db, 'company_contacts', 'validated_at', 'TEXT');
+
   // Crees ici (pas dans schema.sql) car ils portent sur des colonnes qui
   // viennent d'etre ajoutees ci-dessus sur une base existante.
   db.exec(`
@@ -46,6 +72,88 @@ function applyColumnMigrations(db: Database): void {
       ON users(entra_tenant_id, entra_object_id)
       WHERE entra_tenant_id IS NOT NULL AND entra_object_id IS NOT NULL;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_nocase ON users(email COLLATE NOCASE);
+    CREATE INDEX IF NOT EXISTS idx_companies_validation_status ON companies(validation_status);
+    CREATE INDEX IF NOT EXISTS idx_companies_submitted_by_student ON companies(submitted_by_student_id);
+    CREATE INDEX IF NOT EXISTS idx_company_contacts_validation_status ON company_contacts(validation_status);
+    CREATE INDEX IF NOT EXISTS idx_company_contacts_submitted_by_student ON company_contacts(submitted_by_student_id);
+  `);
+}
+
+/**
+ * Une ligne historique marquee 'validated' sans validated_at (colonne ajoutee
+ * par ALTER TABLE, donc NULL par defaut) recoit sa date de creation : ALTER
+ * TABLE ADD COLUMN ne supporte pas de defaut non constant comme
+ * datetime('now'), voir addColumnIfMissing('users', 'updated_at', ...)
+ * ci-dessus pour le meme constat sur users.
+ */
+function backfillValidationTimestamps(db: Database): void {
+  db.prepare(
+    `UPDATE companies SET validated_at = created_at WHERE validation_status = 'validated' AND validated_at IS NULL`,
+  ).run();
+  db.prepare(
+    `UPDATE company_contacts SET validated_at = created_at WHERE validation_status = 'validated' AND validated_at IS NULL`,
+  ).run();
+}
+
+interface UniquenessConflict {
+  key: string;
+  ids: number[];
+}
+
+/**
+ * groupExprs peut contenir plusieurs expressions (ex: nom + adresse) : le
+ * GROUP BY porte sur les colonnes reelles, pas sur une concatenation, pour ne
+ * jamais rapporter un faux conflit entre deux combinaisons distinctes (ex:
+ * nom="ab"+adresse="" et nom="a"+adresse="b").
+ */
+function findNormalizedConflicts(
+  db: Database,
+  table: 'companies' | 'company_contacts',
+  groupExprs: string[],
+): UniquenessConflict[] {
+  const selectCols = groupExprs.map((expr, i) => `${expr} as k${i}`).join(', ');
+  const groupBy = groupExprs.join(', ');
+  const rows = db
+    .prepare(`SELECT ${selectCols}, GROUP_CONCAT(id) as ids FROM ${table} GROUP BY ${groupBy} HAVING COUNT(*) > 1`)
+    .all() as Record<string, string>[];
+  return rows.map((r) => ({
+    key: groupExprs.map((_, i) => r[`k${i}`]).join(' / '),
+    ids: r.ids.split(',').map(Number),
+  }));
+}
+
+/**
+ * L'email d'un contact et le couple nom/adresse d'une entreprise sont des
+ * cles metier uniques (voir spec). Une base historique en conflit ne doit
+ * jamais etre corrigee automatiquement (pas de suppression ni de fusion) :
+ * la migration echoue avec les identifiants a corriger, et les index uniques
+ * ne sont pas crees tant que le conflit n'est pas resolu manuellement.
+ */
+function enforceCompanyAndContactUniqueness(db: Database): void {
+  const emailConflicts = findNormalizedConflicts(db, 'company_contacts', ['LOWER(TRIM(email))']);
+  const companyConflicts = findNormalizedConflicts(db, 'companies', [
+    'LOWER(TRIM(name))',
+    "LOWER(TRIM(COALESCE(address, '')))",
+  ]);
+
+  if (emailConflicts.length > 0 || companyConflicts.length > 0) {
+    const lines = [
+      ...emailConflicts.map((c) => `  company_contacts.email="${c.key}" ids=[${c.ids.join(', ')}]`),
+      ...companyConflicts.map((c) => `  companies (nom / adresse)="${c.key}" ids=[${c.ids.join(', ')}]`),
+    ];
+    throw new Error(
+      [
+        "[db] Conflits d'unicite detectes avant migration : les index uniques n'ont pas ete crees.",
+        'Corrigez manuellement ces enregistrements (aucune suppression ni fusion automatique) puis relancez :',
+        ...lines,
+      ].join('\n'),
+    );
+  }
+
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_company_contacts_email_norm ON company_contacts(LOWER(TRIM(email)));
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_name_address_norm
+      ON companies(LOWER(TRIM(name)), LOWER(TRIM(COALESCE(address, ''))));
   `);
 }
 

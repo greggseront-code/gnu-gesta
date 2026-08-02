@@ -2,7 +2,26 @@
 
 Date : 2026-08-02
 
-Statut : brouillon
+Statut : implémenté (voir `docs/reviews/2026-08-02-validation-offres-entreprises-contacts.md`)
+
+## Écarts d'exécution par rapport à ce plan
+
+* Tâche 005 : le retrait effectif de `PATCH /api/offers/:id/company` et de
+  `changeOfferCompany` (backend et frontend) a été reporté à la fin de la
+  tâche 008, une fois `admin-offers.page.tsx` migré vers
+  `PATCH /:id/assignment` — conformément à la note de migration du plan
+  ("le client frontend doit migrer vers /assignment avant le retrait de
+  /company dans la même intervention"), mais après la tâche 005 elle-même
+  plutôt que dans la même tâche numérotée.
+* Décision non explicitée par le plan : une création d'offre par le
+  gestionnaire qui référence une entreprise ou un contact encore en attente
+  est refusée (`409`) plutôt que d'être rétrogradée silencieusement en
+  `soumise`, afin de ne jamais surprendre le gestionnaire avec un statut
+  différent de celui annoncé par la règle "une offre gestionnaire est
+  directement publiée".
+* Aucun autre écart identifié : les tâches 001 à 009 ont été implémentées
+  telles que décrites, avec des tests supplémentaires ajoutés à la tâche 009
+  au-delà de la liste minimale du plan (voir la review).
 
 ## Contexte
 
@@ -205,24 +224,24 @@ frontend/src/
 
 **Travail :**
 
-* [ ] Ajouter à `companies` l'état de validation,
+* [x] Ajouter à `companies` l'état de validation,
   `submitted_by_student_id` et `validated_at`.
-* [ ] Ajouter les mêmes informations à `company_contacts`, ainsi que
+* [x] Ajouter les mêmes informations à `company_contacts`, ainsi que
   `created_with_company`.
-* [ ] Contraindre les statuts à `pending` ou `validated` et les booléens à
+* [x] Contraindre les statuts à `pending` ou `validated` et les booléens à
   `0` ou `1` selon les conventions SQLite du projet.
-* [ ] Ajouter les index utiles aux files d'attente et aux recherches par
+* [x] Ajouter les index utiles aux files d'attente et aux recherches par
   créateur.
-* [ ] Ajouter l'index unique global sur l'email normalisé des contacts.
-* [ ] Ajouter l'index unique sur le couple nom/adresse normalisé des
+* [x] Ajouter l'index unique global sur l'email normalisé des contacts.
+* [x] Ajouter l'index unique sur le couple nom/adresse normalisé des
   entreprises, avec équivalence entre adresse nulle et adresse vide.
-* [ ] Ajouter un audit de pré-migration qui liste les identifiants en conflit et
+* [x] Ajouter un audit de pré-migration qui liste les identifiants en conflit et
   bloque la création des index sans modifier les données.
-* [ ] Étendre `applyColumnMigrations()` pour les bases existantes sans recréer
+* [x] Étendre `applyColumnMigrations()` pour les bases existantes sans recréer
   les tables ni perdre de données.
-* [ ] Garantir que toutes les lignes existantes et les seeds sont marqués
+* [x] Garantir que toutes les lignes existantes et les seeds sont marqués
   `validated`, avec un `validated_at` cohérent.
-* [ ] Tester une base neuve, une base historique sans conflit et une base
+* [x] Tester une base neuve, une base historique sans conflit et une base
   historique contenant chaque type de conflit avant migration.
 
 **Verification:**
@@ -254,27 +273,27 @@ frontend/src/
 
 **Travail :**
 
-* [ ] Faire passer `req.auth` aux services de création, liste, recherche,
+* [x] Faire passer `req.auth` aux services de création, liste, recherche,
   détection de doublons et lecture détaillée.
-* [ ] Créer une entreprise et ses contacts initiaux comme `pending` avec le
+* [x] Créer une entreprise et ses contacts initiaux comme `pending` avec le
   créateur lorsque le rôle effectif est `etudiant`.
-* [ ] Créer les entreprises et contacts du gestionnaire comme `validated`.
-* [ ] Retirer au rôle `entreprise` le droit de créer une entreprise.
-* [ ] Ouvrir l'ajout de contact à l'étudiant lorsque l'entreprise cible est
+* [x] Créer les entreprises et contacts du gestionnaire comme `validated`.
+* [x] Retirer au rôle `entreprise` le droit de créer une entreprise.
+* [x] Ouvrir l'ajout de contact à l'étudiant lorsque l'entreprise cible est
   validée ou est sa propre entreprise en attente.
-* [ ] Créer un contact étudiant comme `pending`, et un contact gestionnaire ou
+* [x] Créer un contact étudiant comme `pending`, et un contact gestionnaire ou
   entreprise propriétaire comme `validated`.
-* [ ] Filtrer toutes les listes et recherches : le gestionnaire voit tout, le
+* [x] Filtrer toutes les listes et recherches : le gestionnaire voit tout, le
   créateur voit ses éléments en attente, les autres rôles ne voient que les
   éléments validés autorisés par leurs règles existantes.
-* [ ] Filtrer les contacts retournés par le détail d'une entreprise avec la
+* [x] Filtrer les contacts retournés par le détail d'une entreprise avec la
   même règle.
-* [ ] Retourner `404` pour un détail en attente demandé par un utilisateur non
+* [x] Retourner `404` pour un détail en attente demandé par un utilisateur non
   autorisé et conserver `403` pour une entreprise qui demande une autre fiche.
-* [ ] Adapter la détection de doublons afin qu'elle ne révèle pas un élément
+* [x] Adapter la détection de doublons afin qu'elle ne révèle pas un élément
   masqué à un étudiant ou au lecteur, tout en restant complète pour le
   gestionnaire.
-* [ ] Traduire les conflits exacts de nom/adresse et d'email en `409`, sans
+* [x] Traduire les conflits exacts de nom/adresse et d'email en `409`, sans
   exposer l'identifiant ni les données d'un élément en attente masqué.
 
 **Verification:**
@@ -305,25 +324,25 @@ frontend/src/
 
 **Travail :**
 
-* [ ] Ajouter `GET /api/companies/pending`, réservé au gestionnaire, avec deux
+* [x] Ajouter `GET /api/companies/pending`, réservé au gestionnaire, avec deux
   collections, les données du créateur, les doublons probables et les offres
   qui référencent chaque élément.
-* [ ] Ajouter la modification d'un contact par le gestionnaire avec validation
+* [x] Ajouter la modification d'un contact par le gestionnaire avec validation
   Zod des mêmes champs que la création.
-* [ ] Appliquer les mêmes contrôles d'unicité aux modifications d'entreprise et
+* [x] Appliquer les mêmes contrôles d'unicité aux modifications d'entreprise et
   de contact qu'à leur création.
-* [ ] Ajouter l'acceptation d'une entreprise dans une transaction qui valide
+* [x] Ajouter l'acceptation d'une entreprise dans une transaction qui valide
   aussi tous ses contacts `created_with_company`.
-* [ ] Ajouter l'acceptation individuelle d'un contact ajouté ultérieurement.
-* [ ] Ajouter le refus d'une entreprise et d'un contact sous forme de
+* [x] Ajouter l'acceptation individuelle d'un contact ajouté ultérieurement.
+* [x] Ajouter le refus d'une entreprise et d'un contact sous forme de
   suppression explicite de la soumission.
-* [ ] Vérifier les références dans `offers.company_id`,
+* [x] Vérifier les références dans `offers.company_id`,
   `offers.priority_contact_id` et `offer_contacts` avant toute suppression.
-* [ ] Retourner `409` et les `offer_ids` concernés si la suppression est
+* [x] Retourner `409` et les `offer_ids` concernés si la suppression est
   bloquée ; ne supprimer aucune donnée dans ce cas.
-* [ ] Refuser les transitions incohérentes : validation répétée, action sur un
+* [x] Refuser les transitions incohérentes : validation répétée, action sur un
   élément absent ou tentative de modération par un autre rôle.
-* [ ] Vérifier l'atomicité de l'acceptation entreprise/contacts et l'absence de
+* [x] Vérifier l'atomicité de l'acceptation entreprise/contacts et l'absence de
   suppression en cascade d'une offre.
 
 **Verification:**
@@ -353,23 +372,23 @@ frontend/src/
 
 **Travail :**
 
-* [ ] Vérifier à la création qu'une entreprise est visible pour l'auteur et
+* [x] Vérifier à la création qu'une entreprise est visible pour l'auteur et
   que chaque contact appartient à cette entreprise.
-* [ ] Exiger que `priority_contact_id` soit inclus dans `contact_ids`.
-* [ ] Autoriser un étudiant à créer une offre avec sa propre entreprise ou ses
+* [x] Exiger que `priority_contact_id` soit inclus dans `contact_ids`.
+* [x] Autoriser un étudiant à créer une offre avec sa propre entreprise ou ses
   propres contacts en attente, mais jamais avec ceux d'un autre étudiant.
-* [ ] Insérer directement en `validee_et_visible` une offre créée par le
+* [x] Insérer directement en `validee_et_visible` une offre créée par le
   gestionnaire et conserver `soumise` pour les rôles étudiant et entreprise.
-* [ ] Conserver l'attribution nécessaire à la visibilité du créateur et
+* [x] Conserver l'attribution nécessaire à la visibilité du créateur et
   enregistrer l'historique de statut attendu lors d'une création directement
   validée.
-* [ ] Calculer pour le gestionnaire les dépendances en attente d'une offre :
+* [x] Calculer pour le gestionnaire les dépendances en attente d'une offre :
   entreprise, contact prioritaire et contacts associés.
-* [ ] Bloquer `POST /api/offers/:id/validate` avec `409` et une réponse
+* [x] Bloquer `POST /api/offers/:id/validate` avec `409` et une réponse
   structurée tant qu'une dépendance est en attente ou incohérente.
-* [ ] Retirer au lecteur la visibilité des offres `soumise`, sans modifier son
+* [x] Retirer au lecteur la visibilité des offres `soumise`, sans modifier son
   accès aux offres déjà publiées selon les règles existantes.
-* [ ] Maintenir la visibilité d'une offre `soumise` pour son étudiant ou son
+* [x] Maintenir la visibilité d'une offre `soumise` pour son étudiant ou son
   entreprise créatrice et le gestionnaire.
 
 **Verification:**
@@ -399,20 +418,20 @@ frontend/src/
 
 **Travail :**
 
-* [ ] Ajouter le schéma de
+* [x] Ajouter le schéma de
   `PATCH /api/offers/:id/assignment` avec entreprise, contact prioritaire et
   liste complète des contacts.
-* [ ] Réserver la route au gestionnaire.
-* [ ] Exiger une entreprise et des contacts validés pour une correction
+* [x] Réserver la route au gestionnaire.
+* [x] Exiger une entreprise et des contacts validés pour une correction
   gestionnaire destinée à débloquer une offre.
-* [ ] Vérifier l'appartenance de tous les contacts et la présence du contact
+* [x] Vérifier l'appartenance de tous les contacts et la présence du contact
   prioritaire dans la liste.
-* [ ] Mettre à jour `offers.company_id`, `offers.priority_contact_id` et
+* [x] Mettre à jour `offers.company_id`, `offers.priority_contact_id` et
   remplacer `offer_contacts` dans une transaction unique.
-* [ ] Retirer `PATCH /api/offers/:id/company` et ses fonctions devenues
+* [x] Retirer `PATCH /api/offers/:id/company` et ses fonctions devenues
   dangereuses après migration de ses appelants.
-* [ ] Tester qu'une transaction invalide laisse l'affectation initiale intacte.
-* [ ] Tester que la réaffectation débloque ensuite le refus de l'ancienne
+* [x] Tester qu'une transaction invalide laisse l'affectation initiale intacte.
+* [x] Tester que la réaffectation débloque ensuite le refus de l'ancienne
   entreprise ou de l'ancien contact.
 
 **Verification:**
@@ -444,27 +463,27 @@ frontend/src/
 
 **Travail :**
 
-* [ ] Ajouter aux types frontend l'état, le créateur et les informations de
+* [x] Ajouter aux types frontend l'état, le créateur et les informations de
   blocage nécessaires, sans exposer de champ interne inutile.
-* [ ] Ajouter les appels API d'ajout de contact étudiant et de réaffectation
+* [x] Ajouter les appels API d'ajout de contact étudiant et de réaffectation
   complète d'une offre.
-* [ ] Afficher avant la recherche d'entreprise le message anti-doublon et
+* [x] Afficher avant la recherche d'entreprise le message anti-doublon et
   garder la création indisponible tant qu'une recherche n'a pas été soumise.
-* [ ] Réinitialiser l'autorisation de créer lorsque le terme de recherche est
+* [x] Réinitialiser l'autorisation de créer lorsque le terme de recherche est
   modifié, afin qu'un ancien résultat ne débloque pas un nouveau terme.
-* [ ] Ajouter à l'étape contact une recherche par nom ou email, le message
+* [x] Ajouter à l'étape contact une recherche par nom ou email, le message
   anti-doublon et un formulaire de création débloqué seulement après cette
   recherche.
-* [ ] Sélectionner immédiatement le contact créé puis permettre la poursuite de
+* [x] Sélectionner immédiatement le contact créé puis permettre la poursuite de
   la proposition.
-* [ ] Signaler visuellement à l'étudiant que sa propre entreprise ou son propre
+* [x] Signaler visuellement à l'étudiant que sa propre entreprise ou son propre
   contact est en attente, sans empêcher son utilisation.
-* [ ] Retirer des pages génériques et du tableau de bord étudiant/entreprise
+* [x] Retirer des pages génériques et du tableau de bord étudiant/entreprise
   les liens de création d'entreprise ; conserver la création directe du
   gestionnaire.
-* [ ] Tester les deux barrières de recherche, les messages, les remises à zéro
+* [x] Tester les deux barrières de recherche, les messages, les remises à zéro
   et la sélection des données nouvellement créées.
-* [ ] Afficher un message métier compréhensible lorsque l'API retourne `409`
+* [x] Afficher un message métier compréhensible lorsque l'API retourne `409`
   pour un contact ou une entreprise déjà existant.
 
 **Verification:**
@@ -495,23 +514,23 @@ frontend/src/
 
 **Travail :**
 
-* [ ] Ajouter un garde frontend fondé sur le rôle effectif `gestionnaire` et
+* [x] Ajouter un garde frontend fondé sur le rôle effectif `gestionnaire` et
   protéger `/admin/companies` sans se limiter au masquage de navigation.
-* [ ] Afficher deux sections adressables avec compteurs, états vide, chargement
+* [x] Afficher deux sections adressables avec compteurs, états vide, chargement
   et erreur.
-* [ ] Présenter pour chaque soumission le créateur, la date, les données utiles,
+* [x] Présenter pour chaque soumission le créateur, la date, les données utiles,
   les doublons probables et les offres qui la référencent.
-* [ ] Relier la modification d'une entreprise à son écran de détail et ajouter
+* [x] Relier la modification d'une entreprise à son écran de détail et ajouter
   l'édition des contacts en attente.
-* [ ] Implémenter les actions accepter et refuser avec confirmation avant la
+* [x] Implémenter les actions accepter et refuser avec confirmation avant la
   suppression.
-* [ ] En cas de `409`, conserver la soumission à l'écran et afficher les liens
+* [x] En cas de `409`, conserver la soumission à l'écran et afficher les liens
   vers toutes les offres à réaffecter.
-* [ ] Après succès, rafraîchir les deux compteurs et retirer l'élément traité de
+* [x] Après succès, rafraîchir les deux compteurs et retirer l'élément traité de
   la file.
-* [ ] Ajouter l'entrée « Admin entreprises » uniquement dans la navigation du
+* [x] Ajouter l'entrée « Admin entreprises » uniquement dans la navigation du
   gestionnaire.
-* [ ] Tester l'accès gestionnaire, les sections, l'acceptation, le refus simple
+* [x] Tester l'accès gestionnaire, les sections, l'acceptation, le refus simple
   et le refus bloqué.
 
 **Verification:**
@@ -542,22 +561,22 @@ frontend/src/
 
 **Travail :**
 
-* [ ] Réserver `/admin/offers` au seul gestionnaire dans la route, la page et
+* [x] Réserver `/admin/offers` au seul gestionnaire dans la route, la page et
   la navigation ; retirer son accès au lecteur.
-* [ ] Afficher pour chaque offre `soumise` les dépendances en attente et les
+* [x] Afficher pour chaque offre `soumise` les dépendances en attente et les
   liens vers `/admin/companies`.
-* [ ] Désactiver l'action de validation lorsque des dépendances sont signalées,
+* [x] Désactiver l'action de validation lorsque des dépendances sont signalées,
   tout en conservant le contrôle `409` du backend.
-* [ ] Remplacer l'outil « Corriger l'entreprise » par une sélection complète de
+* [x] Remplacer l'outil « Corriger l'entreprise » par une sélection complète de
   l'entreprise, du contact prioritaire et des contacts associés validés.
-* [ ] Appeler la nouvelle route de réaffectation puis recharger les blocages de
+* [x] Appeler la nouvelle route de réaffectation puis recharger les blocages de
   validation.
-* [ ] Conserver les actions existantes de refus et de clôture d'offre.
-* [ ] Charger sur l'accueil gestionnaire les compteurs d'offres, entreprises et
+* [x] Conserver les actions existantes de refus et de clôture d'offre.
+* [x] Charger sur l'accueil gestionnaire les compteurs d'offres, entreprises et
   contacts en attente.
-* [ ] Faire pointer les compteurs vers `/admin/offers` et vers la section
+* [x] Faire pointer les compteurs vers `/admin/offers` et vers la section
   correspondante de `/admin/companies`.
-* [ ] Tester les blocages, la réaffectation, les permissions et les trois
+* [x] Tester les blocages, la réaffectation, les permissions et les trois
   compteurs.
 
 **Verification:**
@@ -586,23 +605,23 @@ frontend/src/
 
 **Travail :**
 
-* [ ] Construire un scénario avec deux étudiants, un gestionnaire, un lecteur
+* [x] Construire un scénario avec deux étudiants, un gestionnaire, un lecteur
   et une entreprise incarnée.
-* [ ] Vérifier listes, recherches et lectures par identifiant pour une
+* [x] Vérifier listes, recherches et lectures par identifiant pour une
   entreprise, un contact et une offre en attente.
-* [ ] Vérifier les créations directement validées et les créations soumises à
+* [x] Vérifier les créations directement validées et les créations soumises à
   modération pour chaque rôle autorisé.
-* [ ] Vérifier qu'un étudiant ne peut utiliser que ses propres dépendances en
+* [x] Vérifier qu'un étudiant ne peut utiliser que ses propres dépendances en
   attente.
-* [ ] Vérifier l'acceptation groupée, l'acceptation séparée et les refus avec ou
+* [x] Vérifier l'acceptation groupée, l'acceptation séparée et les refus avec ou
   sans référence.
-* [ ] Vérifier que les routes gestionnaire retournent `403` aux autres rôles et
+* [x] Vérifier que les routes gestionnaire retournent `403` aux autres rôles et
   `401` sans session.
-* [ ] Vérifier l'invariant entreprise/contacts avant et après réaffectation.
-* [ ] Vérifier l'unicité de l'email des contacts et du couple nom/adresse des
+* [x] Vérifier l'invariant entreprise/contacts avant et après réaffectation.
+* [x] Vérifier l'unicité de l'email des contacts et du couple nom/adresse des
   entreprises à la création comme à la modification, avec casse, espaces et
   adresse absente.
-* [ ] Vérifier le cycle complet : proposition étudiante, contrôle des données,
+* [x] Vérifier le cycle complet : proposition étudiante, contrôle des données,
   validation de l'offre puis visibilité pour un autre étudiant.
 
 **Verification:**
@@ -639,20 +658,20 @@ frontend/src/
 
 **Travail :**
 
-* [ ] Documenter les nouveaux champs, index et relations dans le modèle de
+* [x] Documenter les nouveaux champs, index et relations dans le modèle de
   données.
-* [ ] Mettre à jour les endpoints, règles serveur, permissions et tests dans
+* [x] Mettre à jour les endpoints, règles serveur, permissions et tests dans
   les deux README de feature.
-* [ ] Mettre à jour les parcours et cas limites frontend dans la carte des
+* [x] Mettre à jour les parcours et cas limites frontend dans la carte des
   features.
-* [ ] Conserver dans `docs/future-extensions.md` la piste d'un modèle de
+* [x] Conserver dans `docs/future-extensions.md` la piste d'un modèle de
   départements rattachés à une entreprise, sans l'introduire dans ce chantier.
-* [ ] Vérifier si l'architecture globale nécessite une modification ; la
+* [x] Vérifier si l'architecture globale nécessite une modification ; la
   laisser inchangée si ses principes restent exacts.
-* [ ] Reporter dans la spec toute décision métier qui aurait changé pendant
+* [x] Reporter dans la spec toute décision métier qui aurait changé pendant
   l'implémentation.
-* [ ] Cocher les tâches réellement terminées et documenter les écarts au plan.
-* [ ] Créer la review depuis le template avec les commandes exécutées, les
+* [x] Cocher les tâches réellement terminées et documenter les écarts au plan.
+* [x] Créer la review depuis le template avec les commandes exécutées, les
   résultats, les limites et les vérifications humaines restantes.
 
 **Verification:**
@@ -730,19 +749,19 @@ frontend/src/
 
 ## Vérification finale
 
-* [ ] Les tests automatisés pertinents passent.
-* [ ] Le build pertinent passe.
-* [ ] Les vérifications manuelles importantes sont listées.
-* [ ] Les documents liés sont à jour.
-* [ ] Les chemins documentés correspondent à la structure réelle.
-* [ ] Les écarts par rapport au plan sont documentés.
-* [ ] Une base historique est migrée sans faire apparaître de faux éléments en
+* [x] Les tests automatisés pertinents passent.
+* [x] Le build pertinent passe.
+* [x] Les vérifications manuelles importantes sont listées.
+* [x] Les documents liés sont à jour.
+* [x] Les chemins documentés correspondent à la structure réelle.
+* [x] Les écarts par rapport au plan sont documentés.
+* [x] Une base historique est migrée sans faire apparaître de faux éléments en
   attente.
-* [ ] Les règles de visibilité sont identiques pour liste, recherche et lecture
+* [x] Les règles de visibilité sont identiques pour liste, recherche et lecture
   directe.
-* [ ] Les erreurs `409` de dépendance sont compréhensibles dans les deux écrans
+* [x] Les erreurs `409` de dépendance sont compréhensibles dans les deux écrans
   gestionnaire.
-* [ ] La réaffectation d'une offre conserve l'invariant entreprise/contacts.
+* [x] La réaffectation d'une offre conserve l'invariant entreprise/contacts.
 
 ## Self-review
 

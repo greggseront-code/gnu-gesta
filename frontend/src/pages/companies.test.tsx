@@ -34,8 +34,14 @@ function renderPage() {
 
 test('affiche les entreprises retournées par l\'API', async () => {
   vi.mocked(companiesApi.listCompanies).mockResolvedValueOnce([
-    { id: 1, name: 'Acme Corp', general_email: 'acme@acme.com', address: null, created_at: '' },
-    { id: 2, name: 'Beta Inc', general_email: 'beta@beta.com', address: null, created_at: '' },
+    {
+      id: 1, name: 'Acme Corp', general_email: 'acme@acme.com', address: null,
+      validation_status: 'validated', submitted_by_student_id: null, validated_at: '2026-01-01', created_at: '',
+    },
+    {
+      id: 2, name: 'Beta Inc', general_email: 'beta@beta.com', address: null,
+      validation_status: 'validated', submitted_by_student_id: null, validated_at: '2026-01-01', created_at: '',
+    },
   ]);
 
   renderPage();
@@ -63,4 +69,32 @@ test('appelle listCompanies avec le terme de recherche saisi', async () => {
   await waitFor(() => {
     expect(companiesApi.listCompanies).toHaveBeenCalledWith('acme');
   });
+});
+
+test('le gestionnaire voit le lien de création directe', async () => {
+  vi.mocked(companiesApi.listCompanies).mockResolvedValue([]);
+
+  renderPage();
+  await screen.findByText('Aucune entreprise trouvée.');
+
+  expect(screen.getByText('+ Nouvelle entreprise')).toBeInTheDocument();
+});
+
+test("l'étudiant ne voit pas le lien de création directe (passe par la recherche du parcours de proposition)", async () => {
+  vi.mocked(authApi.getCurrentUser).mockResolvedValue({
+    name: 'Alice Étudiante',
+    email: 'alice@student.vinci.be',
+    baseRole: 'etudiant',
+    role: 'etudiant',
+    entityId: 1,
+    status: 'ok',
+    impersonation: null,
+    csrfToken: 'csrf-token',
+  });
+  vi.mocked(companiesApi.listCompanies).mockResolvedValue([]);
+
+  renderPage();
+  await screen.findByText('Aucune entreprise trouvée.');
+
+  expect(screen.queryByText('+ Nouvelle entreprise')).not.toBeInTheDocument();
 });

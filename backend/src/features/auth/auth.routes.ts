@@ -147,7 +147,7 @@ authRouter.post('/impersonation', (req, res) => {
   }
 
   const { kind, entityId } = result.data;
-  const entity = kind === 'student' ? findStudentById(getDb(), entityId) : findCompanyById(getDb(), entityId);
+  const entity = kind === 'student' ? findStudentById(getDb(), entityId) : findCompanyById(getDb(), entityId, req.auth);
   if (!entity) {
     res.status(404).json({ error: 'Entité introuvable' });
     return;

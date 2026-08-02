@@ -6,7 +6,11 @@ import { useAuth } from '../context/auth-context';
 
 export function CompaniesPage() {
   const { role } = useAuth();
-  const canCreate = role === 'gestionnaire' || role === 'etudiant' || role === 'entreprise';
+  // La création directe depuis l'annuaire générique reste réservée au
+  // gestionnaire : un étudiant passe obligatoirement par la recherche du
+  // parcours de proposition (voir student-proposal.page.tsx), une entreprise
+  // ne peut pas créer sa propre fiche (voir spec).
+  const canCreate = role === 'gestionnaire';
   const [companies, setCompanies] = useState<Company[]>([]);
   const [search, setSearch] = useState('');
 

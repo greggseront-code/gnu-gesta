@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
 import { listPedagogicalOffers } from '../features/offers/offers.api';
-import { listCompanies, listCompaniesWithDuplicateRisk } from '../features/companies/companies.api';
+import { listCompanies, listCompaniesWithDuplicateRisk, listPendingQueue } from '../features/companies/companies.api';
 import type { Offer } from '../features/offers/offers.types';
 import type { Company } from '../features/companies/companies.types';
 
@@ -13,6 +13,8 @@ function GestionnaireHome() {
   const [closableOffers, setClosableOffers] = useState<Offer[]>([]);
   const [recentCompanies, setRecentCompanies] = useState<Company[]>([]);
   const [duplicateCompanies, setDuplicateCompanies] = useState<Company[]>([]);
+  const [pendingCompaniesCount, setPendingCompaniesCount] = useState(0);
+  const [pendingContactsCount, setPendingContactsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,8 +31,9 @@ function GestionnaireHome() {
       listPedagogicalOffers(),
       listCompaniesWithDuplicateRisk(),
       listCompanies(),
+      listPendingQueue(),
     ])
-      .then(([offers, dupes, companies]) => {
+      .then(([offers, dupes, companies, pendingQueue]) => {
         setPendingOffers(offers.filter((o) => o.status === 'soumise'));
         setClosableOffers(offers.filter((o) => o.status === 'validee_et_visible'));
         setDuplicateCompanies(dupes);
@@ -38,6 +41,8 @@ function GestionnaireHome() {
           (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         );
         setRecentCompanies(sorted.slice(0, 5));
+        setPendingCompaniesCount(pendingQueue.companies.length);
+        setPendingContactsCount(pendingQueue.contacts.length);
       })
       .catch((err: unknown) =>
         setError(err instanceof Error ? err.message : 'Erreur de chargement'),
@@ -98,6 +103,31 @@ function GestionnaireHome() {
         <p className="text-muted">Chargement…</p>
       ) : (
         <div className="stack-lg">
+          {/* Compteurs des files de modération */}
+          <div className="dashboard-grid">
+            <Link to="/admin/offers" className="dashboard-card">
+              <div className="dashboard-card-icon">📋</div>
+              <div className="dashboard-card-title">
+                Offres en attente <span className="badge badge-warning">{pendingOffers.length}</span>
+              </div>
+              <div className="dashboard-card-desc">Offres soumises à valider ou refuser.</div>
+            </Link>
+            <Link to="/admin/companies#pending-companies" className="dashboard-card">
+              <div className="dashboard-card-icon">🏢</div>
+              <div className="dashboard-card-title">
+                Entreprises en attente <span className="badge badge-warning">{pendingCompaniesCount}</span>
+              </div>
+              <div className="dashboard-card-desc">Entreprises proposées par des étudiants.</div>
+            </Link>
+            <Link to="/admin/companies#pending-contacts" className="dashboard-card">
+              <div className="dashboard-card-icon">👤</div>
+              <div className="dashboard-card-title">
+                Contacts en attente <span className="badge badge-warning">{pendingContactsCount}</span>
+              </div>
+              <div className="dashboard-card-desc">Contacts proposés par des étudiants.</div>
+            </Link>
+          </div>
+
           {/* Section 1 — Offres en attente */}
           <div className="card">
             <div className="card-header">
@@ -321,9 +351,10 @@ function LecteurHome() {
 // ─── Default (etudiant / entreprise / other) ──────────────────────────────────
 
 function DefaultHome() {
-  const { role } = useAuth();
-  const canCreate = role === 'gestionnaire' || role === 'etudiant' || role === 'entreprise';
-
+  // Réservé à etudiant/entreprise (gestionnaire et lecteur ont leur propre
+  // tableau de bord) : la création d'entreprise ne figure plus ici — un
+  // étudiant passe par la recherche du parcours de proposition, une
+  // entreprise ne peut pas créer sa propre fiche (voir spec).
   return (
     <div>
       <div className="page-header">
@@ -343,13 +374,6 @@ function DefaultHome() {
           <div className="dashboard-card-title">Offres de stage</div>
           <div className="dashboard-card-desc">Parcourir les offres de stage disponibles.</div>
         </Link>
-        {canCreate && (
-          <Link to="/admin/companies/new" className="dashboard-card">
-            <div className="dashboard-card-icon">➕</div>
-            <div className="dashboard-card-title">Nouvelle entreprise</div>
-            <div className="dashboard-card-desc">Ajouter une entreprise et ses contacts au répertoire.</div>
-          </Link>
-        )}
       </div>
     </div>
   );

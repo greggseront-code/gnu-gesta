@@ -16,6 +16,10 @@ export const OfferInputSchema = z
   .refine((d) => !d.remote_allowed || d.remote_percentage != null, {
     message: 'remote_percentage est requis si remote_allowed est true',
     path: ['remote_percentage'],
+  })
+  .refine((d) => d.contact_ids.includes(d.priority_contact_id), {
+    message: 'priority_contact_id doit figurer dans contact_ids',
+    path: ['priority_contact_id'],
   });
 
 export const PatchOfferSchema = z.object({
@@ -28,6 +32,17 @@ export const PatchOfferSchema = z.object({
   remarks: z.string().optional(),
 });
 
-export const PatchOfferCompanySchema = z.object({
-  company_id: z.number().int().positive(),
-});
+/**
+ * Remplace atomiquement l'entreprise, le contact prioritaire et les contacts
+ * associés d'une offre (voir PATCH /api/offers/:id/assignment).
+ */
+export const OfferAssignmentSchema = z
+  .object({
+    company_id: z.number().int().positive(),
+    priority_contact_id: z.number().int().positive(),
+    contact_ids: z.array(z.number().int().positive()).min(1),
+  })
+  .refine((d) => d.contact_ids.includes(d.priority_contact_id), {
+    message: 'priority_contact_id doit figurer dans contact_ids',
+    path: ['priority_contact_id'],
+  });
