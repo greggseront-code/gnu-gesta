@@ -1,8 +1,8 @@
 -- Seed de développement
--- Gestionnaire et lecteur de base
-INSERT OR IGNORE INTO users (email, role) VALUES
-  ('admin@ecole.fr',   'gestionnaire'),
-  ('lecteur@ecole.fr', 'lecteur');
+-- Aucun faux utilisateur `users` : les identités viennent de la connexion
+-- Microsoft Entra (voir backend/src/features/auth/README.md), jamais du
+-- seed. Le déclenchement de ce seed (runSeed() dans db.migrate.ts) teste la
+-- table `students`, pas `users`.
 
 -- ── Étudiants ──────────────────────────────────────────────────────────────────
 -- 10 à consonance belge, 4 arabes, 3 slaves, 3 sud-américains

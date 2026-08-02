@@ -62,7 +62,10 @@ Voir aussi : `docs/data-model.md`.
 
 ## Permissions
 
-* `GET /api/companies` : public.
+* `GET /api/companies` : toute session authentifiée (`gestionnaire`,
+  `lecteur`, `etudiant`, `entreprise`). Utilisé comme référentiel de
+  recherche par plusieurs écrans (admin offres, admin candidatures, accueil,
+  proposition de stage étudiante), pas seulement par l'écran Entreprises.
 * `GET /api/companies/:id` : `gestionnaire`, `lecteur`, `etudiant`,
   `entreprise`; une entreprise est limitée à sa propre fiche.
 * `POST /api/companies` : `gestionnaire`, `etudiant`, `entreprise`.

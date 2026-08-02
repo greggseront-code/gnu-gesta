@@ -13,8 +13,12 @@ import { requireRole, requireEntityOwnership } from '../../middlewares/authoriza
 
 export const companiesRouter = Router();
 
-// GET / — public (needed for role-select page and student reference)
-companiesRouter.get('/', (req, res) => {
+// GET / — tout rôle authentifié (jalon 4 : ferme l'accès anonyme). Utilisé
+// comme référentiel de recherche par gestionnaire/lecteur (admin-offers,
+// admin-applications, accueil) et étudiant (proposition de stage) ; voir la
+// review du jalon 4 pour le détail de cet écart par rapport à la décision
+// initiale (gestionnaire+étudiant uniquement).
+companiesRouter.get('/', requireRole('gestionnaire', 'lecteur', 'etudiant', 'entreprise'), (req, res) => {
   if (req.query.duplicate_risk === 'true') {
     res.json(getCompaniesWithDuplicateRisk());
     return;

@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { listStudents } from '../features/students/students.api';
 import type { Student } from '../features/students/students.types';
-import { useRole } from '../context/role-context';
+import { useAuth } from '../context/auth-context';
 
 export function StudentsPage() {
-  const { role } = useRole();
+  const { role } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);

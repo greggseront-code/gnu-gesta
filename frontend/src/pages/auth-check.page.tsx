@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -28,9 +28,14 @@ function PageShell({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Destination transitoire du callback Microsoft : redirige vers l'accueil,
+ * vers /account-not-linked, ou affiche l'erreur/le formulaire de reconnexion.
+ * Ne reste jamais affichée pour un compte valide (voir plan jalon 6).
+ */
 export function AuthCheckPage() {
   const location = useLocation();
-  const { user, loading, error, logout } = useAuth();
+  const { user, loading, error } = useAuth();
 
   const callbackError = useMemo(
     () => new URLSearchParams(location.search).get('error'),
@@ -72,21 +77,9 @@ export function AuthCheckPage() {
     );
   }
 
-  if ('role' in user) {
-    return (
-      <PageShell>
-        <p>{user.name} — {user.email}</p>
-        <p>Rôle : Gestionnaire</p>
-        <button className="btn btn-secondary" onClick={() => logout()}>Se déconnecter</button>
-      </PageShell>
-    );
+  if (user.status === 'student_not_imported') {
+    return <Navigate to="/account-not-linked" replace />;
   }
 
-  return (
-    <PageShell>
-      <p>{user.name} — {user.email}</p>
-      <p role="alert">Pilote réservé au gestionnaire. Ce compte n'a pas ce rôle.</p>
-      <button className="btn btn-secondary" onClick={() => logout()}>Se déconnecter</button>
-    </PageShell>
-  );
+  return <Navigate to="/" replace />;
 }

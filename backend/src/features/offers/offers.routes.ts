@@ -23,7 +23,9 @@ function isVisible(offer: Offer, auth: { role: string | null; entityId: number |
   if (role === 'gestionnaire' || role === 'lecteur') return true;
   if (role === 'etudiant') return offer.status === 'validee_et_visible' || offer.submitted_by_student_id === entityId;
   if (role === 'entreprise') return offer.company_id === entityId;
-  return offer.status === 'validee_et_visible';
+  // Inatteignable derriere requireRole() sur les deux routes GET (jalon 4) :
+  // aucun visiteur anonyme ou role null n'atteint plus ce point.
+  return false;
 }
 
 function canWrite(offer: Offer, auth: { role: string | null; entityId: number | null }): boolean {
@@ -35,7 +37,7 @@ function canWrite(offer: Offer, auth: { role: string | null; entityId: number | 
 }
 
 // GET / — scoped by role, optional ?search=
-offersRouter.get('/', (req, res) => {
+offersRouter.get('/', requireRole('gestionnaire', 'lecteur', 'etudiant', 'entreprise'), (req, res) => {
   const search = typeof req.query.search === 'string' ? req.query.search : undefined;
   res.json(getOffers(req.auth, search));
 });
@@ -48,7 +50,7 @@ offersRouter.post('/', requireRole('gestionnaire', 'etudiant', 'entreprise'), (r
 });
 
 // GET /:id — scoped visibility
-offersRouter.get('/:id', (req, res) => {
+offersRouter.get('/:id', requireRole('gestionnaire', 'lecteur', 'etudiant', 'entreprise'), (req, res) => {
   const offer = getOfferById(Number(req.params.id));
   if (!offer) { res.status(404).json({ error: 'Offre non trouvée' }); return; }
   if (!isVisible(offer, req.auth)) {

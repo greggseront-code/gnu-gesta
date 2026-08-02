@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useRole } from '../context/role-context';
+import { useAuth } from '../context/auth-context';
 import { listPedagogicalOffers } from '../features/offers/offers.api';
 import { listCompanies, listCompaniesWithDuplicateRisk } from '../features/companies/companies.api';
 import type { Offer } from '../features/offers/offers.types';
@@ -321,7 +321,7 @@ function LecteurHome() {
 // ─── Default (etudiant / entreprise / other) ──────────────────────────────────
 
 function DefaultHome() {
-  const { role } = useRole();
+  const { role } = useAuth();
   const canCreate = role === 'gestionnaire' || role === 'etudiant' || role === 'entreprise';
 
   return (
@@ -358,7 +358,7 @@ function DefaultHome() {
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export function HomePage() {
-  const { role } = useRole();
+  const { role } = useAuth();
   if (role === 'gestionnaire') return <GestionnaireHome />;
   if (role === 'lecteur') return <LecteurHome />;
   return <DefaultHome />;

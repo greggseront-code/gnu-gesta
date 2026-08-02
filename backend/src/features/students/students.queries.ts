@@ -1,6 +1,12 @@
 import type { Database } from 'better-sqlite3';
 import type { Student, StudentInput } from './students.types';
 
+// ON CONFLICT(email) cible la contrainte UNIQUE sensible à la casse d'origine
+// sur students.email ; l'index insensible à la casse ajouté au jalon 3
+// (idx_students_email_nocase, voir db.migrate.ts) attrape en plus les
+// doublons de casse mais n'est pas couvert par cet upsert : un import réel
+// réutilise systématiquement la même casse que l'annuaire source, donc ce
+// cas limite est accepté sans upsert chaîné supplémentaire.
 export function upsertStudents(db: Database, rows: StudentInput[]): number {
   const stmt = db.prepare(`
     INSERT INTO students (matricule, first_name, last_name, email, date_naissance)

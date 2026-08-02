@@ -1,7 +1,9 @@
 import { randomBytes, createHash } from 'crypto';
+import type { Database } from 'better-sqlite3';
 import type { AuthConfig } from './auth.config';
 import type { EntraAuthProvider } from './entra.client';
-import type { PendingAuthState, PilotSessionUser } from './auth.types';
+import { upsertIdentity, findStudentIdByEmail } from './auth.queries';
+import type { BaseRole, PendingAuthState, SessionUser } from './auth.types';
 
 function base64url(input: Buffer): string {
   return input.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -21,8 +23,51 @@ function generatePkcePair(): { verifier: string; challenge: string } {
   return { verifier, challenge };
 }
 
+export function generateCsrfToken(): string {
+  return base64url(randomBytes(24));
+}
+
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
+}
+
+const STUDENT_EMAIL_DOMAIN = 'student.vinci.be';
+
+/** Domaine = partie apres le dernier `@` uniquement (rejette `...@student.vinci.be.example.org`). */
+function emailDomain(email: string): string {
+  const normalized = normalizeEmail(email);
+  return normalized.slice(normalized.lastIndexOf('@') + 1);
+}
+
+/**
+ * Ordre impose par la spec : gestionnaire exact, puis domaine etudiant
+ * exact, puis lecteur par defaut. `mail` n'intervient jamais ici : seul le
+ * `userPrincipalName` verifie peut elever au role gestionnaire ou etudiant.
+ */
+export function classifyBaseRole(config: AuthConfig, userPrincipalName: string): BaseRole {
+  if (normalizeEmail(userPrincipalName) === normalizeEmail(config.GESTA_MANAGER_EMAIL)) {
+    return 'gestionnaire';
+  }
+  if (emailDomain(userPrincipalName) === STUDENT_EMAIL_DOMAIN) {
+    return 'etudiant';
+  }
+  return 'lecteur';
+}
+
+/**
+ * Lie un compte etudiant a une fiche `students` existante : essaie d'abord
+ * le `userPrincipalName` verifie, puis `mail` seulement s'il differe et
+ * uniquement pour une correspondance exacte (unicite garantie par l'index
+ * insensible a la casse sur students.email). Ne cree jamais de fiche.
+ */
+function linkStudentEntity(db: Database, profile: { userPrincipalName: string; mail: string | null }): number | null {
+  const byUpn = findStudentIdByEmail(db, profile.userPrincipalName);
+  if (byUpn !== null) return byUpn;
+
+  if (profile.mail && normalizeEmail(profile.mail) !== normalizeEmail(profile.userPrincipalName)) {
+    return findStudentIdByEmail(db, profile.mail);
+  }
+  return null;
 }
 
 export interface LoginRequestResult {
@@ -61,16 +106,17 @@ export interface AuthCallbackQuery {
 }
 
 /**
- * Valide le retour Microsoft (state, tenant) et classe le compte. Le pilote
- * ne reconnait qu'une seule adresse gestionnaire ; tout autre compte du
- * tenant reste authentifie mais sans role metier (`pilot_not_manager`).
+ * Valide le retour Microsoft (state, tenant), classe le compte et le lie au
+ * referentiel etudiant si applicable. Cree/actualise `users` par tid+oid
+ * sans jamais persister de jeton Microsoft.
  */
 export async function handleAuthCallback(
   provider: EntraAuthProvider,
   config: AuthConfig,
+  db: Database,
   pendingAuth: PendingAuthState | undefined,
   query: AuthCallbackQuery,
-): Promise<PilotSessionUser> {
+): Promise<SessionUser> {
   if (query.error) {
     throw new AuthCallbackError('entra_error');
   }
@@ -98,13 +144,47 @@ export async function handleAuthCallback(
     }
 
     const profile = await provider.getMe(token.accessToken);
+    const baseRole = classifyBaseRole(config, profile.userPrincipalName);
 
-    const isManager = normalizeEmail(profile.userPrincipalName) === normalizeEmail(config.GESTA_MANAGER_EMAIL);
+    let entityId: number | null = null;
+    if (baseRole === 'etudiant') {
+      entityId = linkStudentEntity(db, profile);
+    }
+    const status = baseRole === 'etudiant' && entityId === null ? 'student_not_imported' : 'ok';
 
-    return isManager
-      ? { kind: 'gestionnaire', displayName: profile.displayName, email: profile.userPrincipalName }
-      : { kind: 'pilot_not_manager', displayName: profile.displayName, email: profile.userPrincipalName };
+    upsertIdentity(db, {
+      tid: token.tenantId,
+      oid: profile.oid,
+      email: profile.userPrincipalName,
+      displayName: profile.displayName,
+      role: baseRole,
+      entityId,
+    });
+
+    return {
+      tid: token.tenantId,
+      oid: profile.oid,
+      email: profile.userPrincipalName,
+      displayName: profile.displayName,
+      baseRole,
+      entityId,
+      status,
+    };
   } finally {
     await provider.clearCache(token.cacheHandle);
+  }
+}
+
+/** Seul le role de base gestionnaire peut activer/quitter un mode d'incarnation (jalon 5). */
+export class ImpersonationForbiddenError extends Error {
+  constructor() {
+    super('impersonation_forbidden');
+    this.name = 'ImpersonationForbiddenError';
+  }
+}
+
+export function assertCanImpersonate(user: SessionUser | undefined): void {
+  if (!user || user.baseRole !== 'gestionnaire') {
+    throw new ImpersonationForbiddenError();
   }
 }

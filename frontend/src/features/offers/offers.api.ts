@@ -1,5 +1,4 @@
-import { ROLE_STORAGE_KEY, type RoleState } from '../../context/role-context';
-import { apiFetch } from '../../lib/api-client';
+import { apiFetch, getCsrfToken } from '../../lib/api-client';
 import type { Offer, OfferInput } from './offers.types';
 
 export function listVisibleOffers(search?: string): Promise<Offer[]> {
@@ -58,26 +57,16 @@ export function changeOfferCompany(id: number, companyId: number): Promise<Offer
 }
 
 export async function uploadOfferAttachment(offerId: number, file: File): Promise<Offer> {
-  const raw = localStorage.getItem(ROLE_STORAGE_KEY);
-  const authHeaders: Record<string, string> = {};
-  if (raw) {
-    try {
-      const { role, entityId } = JSON.parse(raw) as RoleState;
-      if (role) authHeaders['x-role'] = role;
-      if (entityId != null) authHeaders['x-entity-id'] = String(entityId);
-    } catch {
-      // ignore
-    }
-  }
-
   const formData = new FormData();
   formData.append('file', file);
 
-  // Do not use apiFetch here: FormData must let the browser set the multipart
-  // boundary, while the V1 auth headers still need to be forwarded manually.
+  // Do not use apiFetch here: FormData must let the browser set the
+  // multipart boundary, so Content-Type cannot be forced to application/json.
+  const csrfToken = getCsrfToken();
   const res = await fetch(`/api/offers/${offerId}/attachment`, {
     method: 'POST',
-    headers: authHeaders,
+    credentials: 'include',
+    headers: csrfToken ? { 'x-csrf-token': csrfToken } : {},
     body: formData,
   });
 

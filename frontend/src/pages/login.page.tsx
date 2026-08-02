@@ -1,6 +1,14 @@
+import { Navigate } from 'react-router-dom';
 import { loginUrl } from '../features/auth/auth.api';
+import { useAuth } from '../context/auth-context';
 
 export function LoginPage() {
+  const { user, loading } = useAuth();
+
+  if (!loading && user && user.status === 'ok') {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="role-select-screen">
       <div className="role-select-container">

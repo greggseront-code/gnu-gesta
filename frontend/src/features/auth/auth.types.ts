@@ -1,13 +1,19 @@
-export interface AuthenticatedManager {
-  name: string;
-  email: string;
-  role: 'gestionnaire';
+export type BaseRole = 'gestionnaire' | 'etudiant' | 'lecteur';
+export type EffectiveRole = BaseRole | 'entreprise';
+export type AccountStatus = 'ok' | 'student_not_imported';
+
+export interface ImpersonationState {
+  kind: 'student' | 'company';
+  entityId: number;
 }
 
-export interface PilotNotManager {
+export interface CurrentAuthUser {
   name: string;
   email: string;
-  status: 'pilot_not_manager';
+  baseRole: BaseRole;
+  role: EffectiveRole | null;
+  entityId: number | null;
+  status: AccountStatus;
+  impersonation: ImpersonationState | null;
+  csrfToken: string;
 }
-
-export type CurrentAuthUser = AuthenticatedManager | PilotNotManager;

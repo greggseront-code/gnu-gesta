@@ -1,30 +1,41 @@
-import { ROLE_STORAGE_KEY, type RoleState } from '../context/role-context';
-
 const API_BASE = '/api';
+const MUTATING_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
 
-function getAuthHeaders(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(ROLE_STORAGE_KEY);
-    if (!raw) return {};
-    const { role, entityId } = JSON.parse(raw) as RoleState;
-    const headers: Record<string, string> = {};
-    if (role) headers['x-role'] = role;
-    if (entityId != null) headers['x-entity-id'] = String(entityId);
-    return headers;
-  } catch {
-    return {};
-  }
+let csrfToken: string | null = null;
+let unauthorizedHandler: (() => void) | null = null;
+
+/** Renseigné par AuthProvider à chaque rafraîchissement de session (voir context/auth-context.tsx). */
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
+}
+
+/** Pour les rares appels qui ne peuvent pas passer par apiFetch (ex: upload FormData, voir offers.api.ts). */
+export function getCsrfToken(): string | null {
+  return csrfToken;
+}
+
+/** Permet à AuthProvider de réagir globalement à un 401 (session expirée) sans que chaque page ne le gère. */
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
 }
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const method = (options?.method ?? 'GET').toUpperCase();
+
   const res = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
+      ...(MUTATING_METHODS.has(method) && csrfToken ? { 'x-csrf-token': csrfToken } : {}),
       ...options?.headers,
     },
     ...options,
   });
+
+  if (res.status === 401) {
+    unauthorizedHandler?.();
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { error?: string }).error ?? `${res.status} ${res.statusText}`);

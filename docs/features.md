@@ -56,6 +56,78 @@ entreprise de sélectionner un candidat.
   l'étudiant.
 * Le champ d'historique `changed_by` n'est pas renseigné lors de la sélection.
 
+## Auth
+
+### But métier
+
+Authentifier les utilisateurs de la Haute École Léonard de Vinci avec
+Microsoft Entra, attribuer un rôle de base côté backend et permettre au seul
+gestionnaire d'incarner temporairement un étudiant ou une entreprise pour
+tester les parcours métier.
+
+### Parcours utilisateur
+
+* Un utilisateur non connecté arrive sur `/login` et se connecte avec
+  Microsoft.
+* Le retour transite par `/auth-check` puis rejoint directement l'accueil.
+* Un étudiant authentifié mais absent du référentiel `students` est redirigé
+  vers `/account-not-linked` et peut revérifier après un import gestionnaire.
+* Le gestionnaire peut activer un mode « Voir comme un étudiant/une
+  entreprise » depuis la barre latérale, puis le quitter à tout moment via un
+  bandeau permanent.
+* « Se déconnecter » supprime la session GNG sans déconnecter le compte
+  Microsoft.
+
+### Règles principales
+
+* Rôle de base : `gregory.seront@vinci.be` exact → `gestionnaire` ; domaine
+  exact `student.vinci.be` → `etudiant` ; tout autre compte du tenant →
+  `lecteur`. Recalculé à chaque connexion.
+* La liaison étudiante compare l'email vérifié (`userPrincipalName` puis
+  `mail` en repli) à `students.email`, sans tenir compte de la casse. Aucune
+  fiche n'est créée automatiquement.
+* Seul un rôle de base `gestionnaire` peut activer une incarnation ; un seul
+  mode actif à la fois ; le rôle de base reste disponible pendant
+  l'incarnation.
+* Toute mutation authentifiée par cookie exige un jeton CSRF
+  (`x-csrf-token`, exposé par `GET /api/auth/me`).
+* `401` = pas de session ; `403` = session insuffisante pour l'opération.
+
+### Contrat front/back
+
+* `GET /api/auth/login`, `GET /api/auth/callback` : flux Microsoft Entra.
+* `GET /api/auth/me` : identité, `baseRole`, rôle effectif, `entityId`,
+  `status`, incarnation active, `csrfToken`.
+* `POST /api/auth/logout` : déconnexion locale.
+* `POST /api/auth/impersonation`, `DELETE /api/auth/impersonation` :
+  activer/quitter un mode temporaire (gestionnaire uniquement).
+* Type frontend principal : `CurrentAuthUser`.
+
+### Pages frontend concernées
+
+* `frontend/src/pages/login.page.tsx`
+* `frontend/src/pages/auth-check.page.tsx`
+* `frontend/src/pages/account-not-linked.page.tsx`
+* `frontend/src/pages/impersonation-select.page.tsx`
+
+### Briques frontend concernées
+
+* `frontend/src/context/auth-context.tsx`
+* `frontend/src/features/auth/auth.api.ts`
+* `frontend/src/components/app-layout.tsx` (badge identité, bandeau
+  d'incarnation, déconnexion)
+
+### Backend lié
+
+* `backend/src/features/auth/README.md`
+
+### Cas limites
+
+* Aucune authentification réelle des entreprises : le rôle effectif
+  `entreprise` n'existe qu'en incarnation gestionnaire.
+* Un seul gestionnaire possible (adresse figée en configuration), pas de
+  gestion dynamique de plusieurs comptes gestionnaire.
+
 ## Companies
 
 ### But métier
@@ -97,7 +169,7 @@ dépôt d'offres, les propositions étudiantes et la consultation par les
 * `frontend/src/pages/admin-company-form.page.tsx`
 * `frontend/src/pages/admin-company-detail.page.tsx`
 * `frontend/src/pages/company-dashboard.page.tsx`
-* `frontend/src/pages/role-select.page.tsx`
+* `frontend/src/pages/impersonation-select.page.tsx`
 * `frontend/src/pages/student-proposal.page.tsx`
 * `frontend/src/pages/submit-offer.page.tsx`
 
@@ -113,8 +185,9 @@ dépôt d'offres, les propositions étudiantes et la consultation par les
 ### Cas limites
 
 * La détection de doublons est approximative.
-* `GET /api/companies` est public pour alimenter la sélection de rôle et le
-  référentiel étudiant.
+* `GET /api/companies` exige une session authentifiée (n'importe quel rôle) ;
+  utilisé comme référentiel de recherche par plusieurs écrans (admin offres,
+  admin candidatures, accueil, proposition de stage étudiante).
 * Les rôles de contacts sont stockés sous forme JSON texte côté SQLite.
 
 ## Offers
@@ -220,7 +293,7 @@ Maintenir le référentiel des étudiants pour permettre l'identification des
 * `frontend/src/pages/students.page.tsx`
 * `frontend/src/pages/students-import.page.tsx`
 * `frontend/src/pages/student-applications.page.tsx`
-* `frontend/src/pages/role-select.page.tsx`
+* `frontend/src/pages/impersonation-select.page.tsx`
 * `frontend/src/pages/company-dashboard.page.tsx`
 
 ### Briques frontend concernées
@@ -236,5 +309,10 @@ Maintenir le référentiel des étudiants pour permettre l'identification des
 
 * Le format exact du CSV n'est pas porté par cette feature backend : l'API reçoit
   déjà des lignes structurées.
-* `GET /api/students` est public pour alimenter l'écran de sélection de rôle.
+* `GET /api/students` exige une session authentifiée
+  (`gestionnaire`, `lecteur` ou `entreprise` — utilisé comme référentiel par
+  admin candidatures et l'espace entreprise ; pas `etudiant`).
+* Un compte étudiant Microsoft sans fiche `students` correspondante
+  (`userPrincipalName`/`mail`) reste authentifié mais bloqué
+  (`student_not_imported`) : aucune fiche n'est créée automatiquement.
 * Le matricule est optionnel dans l'import, mais unique s'il est présent.

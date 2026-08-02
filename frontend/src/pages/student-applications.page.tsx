@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useRole } from '../context/role-context';
+import { useAuth } from '../context/auth-context';
 import { listStudentApplications } from '../features/applications/applications.api';
 import type { Application } from '../features/applications/applications.api';
 import { listMyStudentOffers } from '../features/offers/offers.api';
@@ -8,7 +8,7 @@ import type { Offer } from '../features/offers/offers.types';
 import { StatusBadge } from '../components/status-badge';
 
 export function StudentApplicationsPage() {
-  const { role, entityId } = useRole();
+  const { role, entityId } = useAuth();
 
   const [applications, setApplications] = useState<Application[]>([]);
   const [offers, setOffers] = useState<Offer[]>([]);

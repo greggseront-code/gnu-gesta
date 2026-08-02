@@ -6,8 +6,12 @@ import { getApplicationsByStudent } from '../applications/applications.service';
 
 export const studentsRouter = Router();
 
-// GET /api/students — public (needed for role-select page)
-studentsRouter.get('/', (_req, res) => {
+// GET /api/students — tout rôle authentifié (jalon 4 : ferme l'accès anonyme).
+// Volontairement plus large que "gestionnaire seul" : admin-applications
+// (lecteur) et company-dashboard (entreprise) l'utilisent comme annuaire de
+// référence pour afficher les noms des candidats. Voir la review du jalon 4
+// pour le détail de cet écart par rapport à la décision initiale.
+studentsRouter.get('/', requireRole('gestionnaire', 'lecteur', 'entreprise'), (_req, res) => {
   res.json(listStudents());
 });
 

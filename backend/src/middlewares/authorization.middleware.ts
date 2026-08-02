@@ -3,10 +3,15 @@ import type { Role } from './auth-context.middleware';
 
 type Handler = (req: Request, res: Response, next: NextFunction) => void;
 
+const NOT_AUTHENTICATED = { error: 'not_authenticated' };
 const DENIED = { error: 'Accès refusé' };
 
 export function requireRole(...roles: Role[]): Handler {
   return (req, res, next) => {
+    if (!req.auth.authenticated) {
+      res.status(401).json(NOT_AUTHENTICATED);
+      return;
+    }
     if (!req.auth.role || !roles.includes(req.auth.role)) {
       res.status(403).json(DENIED);
       return;
@@ -35,7 +40,15 @@ export function requireEntityOwnership(param = 'id'): Handler {
 export function requireReadOnly(): Handler {
   return (req, res, next) => {
     const isWrite = ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method);
-    if (isWrite && (!req.auth.role || req.auth.role === 'lecteur')) {
+    if (!isWrite) {
+      next();
+      return;
+    }
+    if (!req.auth.authenticated) {
+      res.status(401).json(NOT_AUTHENTICATED);
+      return;
+    }
+    if (!req.auth.role || req.auth.role === 'lecteur') {
       res.status(403).json(DENIED);
       return;
     }

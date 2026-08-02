@@ -12,6 +12,19 @@ Environment=PORT=3000
 # deploy.sh (voir docs/deployment.md). Le prefixe "-" rend ce fichier
 # optionnel : s'il est absent, NODE_ENV=production (ci-dessus) s'applique.
 EnvironmentFile=-/etc/gnu-gesta/deploy-env.conf
+# Secrets Entra/session (ENTRA_*, SESSION_SECRET, GESTA_MANAGER_EMAIL, ...),
+# permissions 600, jamais dans Git : voir docs/deployment.md ("Secrets
+# authentification Microsoft Entra"). Prefixe "-" pour ne pas empecher
+# systemd de demarrer l'unite si le fichier n'existe pas encore ; le
+# processus Node echoue alors lui-meme avec un message clair
+# (auth.config.ts, isProductionLikeEnvironment()) plutot que de demarrer
+# avec une configuration Entra absente.
+EnvironmentFile=-/etc/gnu-gesta/backend.env
+# Verifie la configuration Entra avant de (re)demarrer le service, sans
+# jamais afficher de valeur sensible (voir scripts/auth-config-check.ts).
+# Echoue le deploiement plutot que de laisser tourner un backend qui
+# plantera de toute facon au premier appel a loadAuthConfig().
+ExecStartPre=/home/ubuntu/gnu-gesta/backend/node_modules/.bin/tsx scripts/auth-config-check.ts
 ExecStart=/home/ubuntu/gnu-gesta/backend/node_modules/.bin/tsx src/server.ts
 Restart=on-failure
 RestartSec=5

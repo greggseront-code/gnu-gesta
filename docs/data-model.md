@@ -23,9 +23,15 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
 
 ## Tables principales
 
-* `users` : utilisateurs applicatifs, rôle et `entity_id`. Le flux V1 actuel
-  utilise surtout les headers `x-role` et `x-entity-id`; l'usage de cette table
-  reste à clarifier.
+* `users` : identité technique Microsoft Entra. `entra_tenant_id` +
+  `entra_object_id` (immuables, uniques ensemble) identifient le compte ;
+  `role` et `entity_id` sont un instantané du dernier login (audit), jamais
+  relus pour autoriser une requête — la session est la seule source de
+  vérité d'autorisation. Les lignes historiques sans `tid`/`oid` (V1
+  headers) restent inertes.
+* `sessions` : sessions Express persistées (`express-session`, store
+  `backend/src/features/auth/session.store.ts`), 8h renouvelables. Remplace
+  le `MemoryStore` du pilote.
 * `students` : référentiel des étudiants.
 * `companies` : référentiel des entreprises.
 * `company_contacts` : contacts rattachés aux entreprises.
@@ -83,8 +89,15 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
 
 ## Contraintes importantes
 
-* `students.email` est unique.
+* `students.email` est unique, insensible à la casse
+  (`idx_students_email_nocase`, ajouté au jalon 3 de l'authentification). Le
+  lien entre une session étudiante et sa fiche `students` se fait par cet
+  email (`userPrincipalName` Microsoft, puis `mail` en repli).
 * `students.matricule` est unique s'il est renseigné.
+* `users.email` est unique, insensible à la casse
+  (`idx_users_email_nocase`) ; le couple `(entra_tenant_id, entra_object_id)`
+  est unique quand les deux sont renseignés
+  (`idx_users_entra_identity`).
 * `applications` impose l'unicité du couple `(offer_id, student_id)`.
 * `offers.status` est limité à `soumise`, `validee_et_visible`, `prise`,
   `non_disponible` et `refusee`.
@@ -94,11 +107,13 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
 ## Limites et questions ouvertes
 
 * La stratégie de migration est minimale : schéma SQL complet plus ajouts de
-  colonnes ciblés dans `db.migrate.ts`.
+  colonnes ciblés dans `db.migrate.ts`. Les index uniques ajoutés sur des
+  colonnes existantes (`users`, `students`) sont créés dans ce même fichier,
+  après les migrations de colonnes dont ils dépendent (voir
+  `normalizeStudentEmails()` dans `db.migrate.ts` pour la résolution des
+  doublons de casse avant contrainte).
 * La migration future vers PostgreSQL n'est pas définie.
 * Le statut `refusee` existe dans le schéma, mais reste à confirmer comme statut
   produit officiel.
-* La table `users` existe dans le schéma, mais l'authentification V1 repose
-  actuellement sur des headers.
 * Le cycle de vie des pièces jointes n'est pas décrit par le modèle relationnel;
   les offres stockent seulement un chemin dans `attachment_path`.

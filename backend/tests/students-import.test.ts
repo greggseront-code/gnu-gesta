@@ -3,6 +3,7 @@ import request from 'supertest';
 import type { Database } from 'better-sqlite3';
 import { app } from '../src/app';
 import { createTestDb, setDb } from '../src/db/db.connection';
+import { loginAsGestionnaire, loginAsLecteur, loginAsEtudiant } from './helpers/authenticated-agent';
 
 const alice = {
   matricule: '202502681',
@@ -30,25 +31,28 @@ describe('students import', () => {
 
   afterEach(() => db.close());
 
-  it('GET /api/students est public (pas d\'auth requise)', async () => {
-    const res = await request(app).get('/api/students');
+  it('GET /api/students exige une session gestionnaire', async () => {
+    const anon = await request(app).get('/api/students');
+    expect(anon.status).toBe(401);
+
+    const { agent } = await loginAsGestionnaire();
+    const res = await agent.get('/api/students');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });
 
   it('POST /api/students/import retourne { imported: N }', async () => {
-    const res = await request(app)
-      .post('/api/students/import')
-      .set('x-role', 'gestionnaire')
-      .send([alice, bob]);
+    const { agent, csrfToken } = await loginAsGestionnaire();
+    const res = await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send([alice, bob]);
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ imported: 2 });
   });
 
   it('GET /api/students retourne les étudiants importés triés par nom', async () => {
-    await request(app).post('/api/students/import').set('x-role', 'gestionnaire').send([alice, bob]);
+    const { agent, csrfToken } = await loginAsGestionnaire();
+    await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send([alice, bob]);
 
-    const res = await request(app).get('/api/students');
+    const res = await agent.get('/api/students');
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(2);
     expect(res.body[0].last_name).toBe('Dupont');
@@ -58,40 +62,46 @@ describe('students import', () => {
   });
 
   it('POST /api/students/import avec email invalide retourne 400', async () => {
-    const res = await request(app)
+    const { agent, csrfToken } = await loginAsGestionnaire();
+    const res = await agent
       .post('/api/students/import')
-      .set('x-role', 'gestionnaire')
+      .set('x-csrf-token', csrfToken)
       .send([{ ...alice, email: 'pas-un-email' }]);
     expect(res.status).toBe(400);
   });
 
   it('POST /api/students/import est idempotent (upsert par email)', async () => {
-    await request(app).post('/api/students/import').set('x-role', 'gestionnaire').send([alice]);
+    const { agent, csrfToken } = await loginAsGestionnaire();
+    await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send([alice]);
 
     // Reimport with updated first_name
-    await request(app)
+    await agent
       .post('/api/students/import')
-      .set('x-role', 'gestionnaire')
+      .set('x-csrf-token', csrfToken)
       .send([{ ...alice, first_name: 'Alice-Updated' }]);
 
-    const res = await request(app).get('/api/students');
+    const res = await agent.get('/api/students');
     expect(res.body).toHaveLength(1);
     expect(res.body[0].first_name).toBe('Alice-Updated');
   });
 
   it('lecteur reçoit 403 sur POST /api/students/import', async () => {
-    const res = await request(app)
-      .post('/api/students/import')
-      .set('x-role', 'lecteur')
-      .send([alice]);
+    const { agent, csrfToken } = await loginAsLecteur();
+    const res = await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send([alice]);
     expect(res.status).toBe(403);
   });
 
   it('etudiant reçoit 403 sur POST /api/students/import', async () => {
-    const res = await request(app)
-      .post('/api/students/import')
-      .set('x-role', 'etudiant')
-      .send([alice]);
+    db.prepare('INSERT INTO students (first_name, last_name, email) VALUES (?, ?, ?)').run('Zoé', 'Zenith', 'zoe@student.vinci.be');
+    const { agent, csrfToken } = await loginAsEtudiant('zoe@student.vinci.be');
+    const res = await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send([alice]);
     expect(res.status).toBe(403);
+  });
+
+  it('une requête POST sans jeton CSRF est refusée', async () => {
+    const { agent } = await loginAsGestionnaire();
+    const res = await agent.post('/api/students/import').send([alice]);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('csrf_invalid');
   });
 });

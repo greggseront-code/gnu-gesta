@@ -2,14 +2,32 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { CompaniesPage } from './companies.page';
+import { AuthProvider } from '../context/auth-context';
 import * as companiesApi from '../features/companies/companies.api';
+import * as authApi from '../features/auth/auth.api';
 
 vi.mock('../features/companies/companies.api');
+vi.mock('../features/auth/auth.api');
+
+beforeEach(() => {
+  vi.mocked(authApi.getCurrentUser).mockResolvedValue({
+    name: 'Gregory Seront',
+    email: 'gregory.seront@vinci.be',
+    baseRole: 'gestionnaire',
+    role: 'gestionnaire',
+    entityId: null,
+    status: 'ok',
+    impersonation: null,
+    csrfToken: 'csrf-token',
+  });
+});
 
 function renderPage() {
   return render(
     <MemoryRouter>
-      <CompaniesPage />
+      <AuthProvider>
+        <CompaniesPage />
+      </AuthProvider>
     </MemoryRouter>,
   );
 }
@@ -40,7 +58,7 @@ test('appelle listCompanies avec le terme de recherche saisi', async () => {
   renderPage();
   await screen.findByText('Aucune entreprise trouvée.');
 
-  await userEvent.type(screen.getByPlaceholderText('Rechercher une entreprise...'), 'acme');
+  await userEvent.type(screen.getByPlaceholderText('Rechercher une entreprise…'), 'acme');
 
   await waitFor(() => {
     expect(companiesApi.listCompanies).toHaveBeenCalledWith('acme');

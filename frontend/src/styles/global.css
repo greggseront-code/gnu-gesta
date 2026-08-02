@@ -770,6 +770,19 @@ a:hover {
   transition: background 0.1s, color 0.1s;
 }
 
+/* ===================== IMPERSONATION BANNER ===================== */
+
+.impersonation-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 2.5rem;
+  background: var(--color-warning-bg, #fef3c7);
+  color: var(--color-warning-text, #92400e);
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--color-warning-border, #fde68a);
+}
+
 .nav-btn:hover {
   background: var(--sidebar-hover-bg);
   color: var(--sidebar-text-active);

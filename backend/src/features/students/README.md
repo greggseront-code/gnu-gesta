@@ -23,7 +23,14 @@ Cette feature ne gère pas de statuts.
 
 * L'import reçoit une liste structurée d'étudiants.
 * L'import fait un upsert basé sur l'email.
-* L'email est obligatoire et unique.
+* L'email est obligatoire et unique, insensible à la casse
+  (`idx_students_email_nocase`) : c'est la clé de liaison avec une session
+  Microsoft étudiante (voir `backend/src/features/auth/README.md`).
+  `ON CONFLICT(email)` (upsert d'import) cible la contrainte historique
+  sensible à la casse ; un ré-import avec une casse différente de celle déjà
+  en base créerait donc un conflit sur l'index insensible à la casse plutôt
+  qu'une mise à jour — accepté en V1 car un import réel réutilise toujours
+  la casse de l'annuaire source (voir `students.queries.ts`).
 * Le matricule est optionnel, mais unique s'il est renseigné.
 * Un étudiant ne peut consulter que ses propres candidatures.
 
@@ -44,10 +51,18 @@ Voir aussi : `docs/data-model.md`.
 
 ## Permissions
 
-* `GET /api/students` : public.
+* `GET /api/students` : `gestionnaire`, `lecteur` ou `entreprise` (session
+  authentifiée requise ; pas `etudiant`). Utilisé comme référentiel par
+  admin candidatures et l'espace entreprise, en plus de l'écran Étudiants.
 * `POST /api/students/import` : `gestionnaire`.
 * `GET /api/students/:studentId/applications` : `gestionnaire`, `lecteur` ou
   étudiant concerné.
+
+Un compte étudiant Microsoft authentifié mais sans fiche correspondante
+(`userPrincipalName`/`mail`) reçoit `student_not_imported` (voir
+`backend/src/features/auth/README.md`) : aucune fiche n'est créée
+automatiquement, et l'accès aux routes métier reste bloqué (`403`) jusqu'à
+un import gestionnaire.
 
 ## Tests back
 

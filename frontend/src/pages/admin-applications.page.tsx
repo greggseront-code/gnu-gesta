@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useRole } from '../context/role-context';
+import { useAuth } from '../context/auth-context';
 import { listPedagogicalOffers } from '../features/offers/offers.api';
 import { listApplications } from '../features/applications/applications.api';
 import type { Application } from '../features/applications/applications.api';
@@ -13,7 +13,7 @@ interface OfferWithApplications {
 }
 
 export function AdminApplicationsPage() {
-  const { role } = useRole();
+  const { role } = useAuth();
   const [groups, setGroups] = useState<OfferWithApplications[]>([]);
   const [studentMap, setStudentMap] = useState<Map<number, string>>(new Map());
   const [companyMap, setCompanyMap] = useState<Map<number, string>>(new Map());

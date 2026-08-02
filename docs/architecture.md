@@ -35,6 +35,8 @@ Acteurs principaux:
 - `docs/reviews/`: bilans datees des taches significatives.
 - `docs/deployment.md`: hebergement, DNS, Nginx, HTTPS et procedure de
   redeploiement.
+- `docs/production-readiness.md`: decisions prises "pour l'instant, en
+  developpement" a reprendre avant une vraie mise en production.
 
 ## Principes architecturaux
 
@@ -89,6 +91,9 @@ Une feature backend significative suit generalement cette structure:
 
 Features backend:
 
+- `auth`: authentification Microsoft Entra, sessions SQLite, calcul du role
+  de base et des incarnations temporaires gestionnaire. Seule source de
+  verite pour `req.auth` (voir `middlewares/auth-context.middleware.ts`).
 - `students`: referentiel et import des etudiants.
 - `companies`: referentiel des entreprises et contacts.
 - `offers`: offres de stage, propositions et cycle de publication.
@@ -104,7 +109,8 @@ Le frontend est organise autour de pages et de features:
 - `features/*/*.api.ts`: clients API par domaine.
 - `features/*/*.types.ts`: types frontend par domaine quand necessaire.
 - `components/`: composants reutilisables.
-- `context/role-context.tsx`: contexte du role courant.
+- `context/auth-context.tsx`: contexte d'authentification (identite, role de
+  base, role effectif, entityId, statut) charge depuis `GET /api/auth/me`.
 - `lib/`: utilitaires transversaux, dont le client API.
 
 Les pages representent les parcours utilisateur principaux: administration des
@@ -122,6 +128,16 @@ des offres, tableau de bord entreprise et propositions etudiantes.
   et candidatures.
 - Les changements de statut d'offre sont un point central du workflow et doivent
   rester coherents entre features.
+- L'authentification Microsoft Entra (tenant Haute Ecole Leonard de Vinci)
+  est la seule source d'identite. Le `gestionnaire` (adresse exacte) et le
+  domaine etudiant `student.vinci.be` attribuent le role de base ; tout autre
+  compte du tenant est `lecteur`. Il n'existe pas de compte Microsoft
+  `entreprise` : ce role n'est accessible que par incarnation temporaire du
+  gestionnaire (voir `backend/src/features/auth/README.md`).
+- La session serveur (cookie `HttpOnly`, SQLite via `session.store.ts`) est
+  l'unique frontiere de securite. Aucune route metier n'accepte de requete
+  anonyme ; `401` signale une session absente, `403` une session insuffisante.
+  Les mutations passent par un jeton CSRF lie a la session.
 
 Les regles detaillees d'une entite ou d'un endpoint appartiennent au README de
 la feature concernee.
@@ -140,8 +156,6 @@ la feature concernee.
 
 ## Open Questions
 
-- Strategie d'authentification cible et remplacement eventuel des headers
-  `x-role` et `x-entity-id`.
 - Statut `refusee`: present dans le code et le schema SQL, mais a confirmer
   comme statut produit officiel.
 - Cycle de vie des pieces jointes.

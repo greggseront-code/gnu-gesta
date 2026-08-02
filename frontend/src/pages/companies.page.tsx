@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { listCompanies } from '../features/companies/companies.api';
 import type { Company } from '../features/companies/companies.types';
-import { useRole } from '../context/role-context';
+import { useAuth } from '../context/auth-context';
 
 export function CompaniesPage() {
-  const { role } = useRole();
+  const { role } = useAuth();
   const canCreate = role === 'gestionnaire' || role === 'etudiant' || role === 'entreprise';
   const [companies, setCompanies] = useState<Company[]>([]);
   const [search, setSearch] = useState('');

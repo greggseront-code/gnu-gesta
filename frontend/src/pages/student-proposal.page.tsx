@@ -6,14 +6,14 @@ import { CONTACT_ROLE_LABELS } from '../features/companies/companies.types';
 import { createOffer, uploadOfferAttachment } from '../features/offers/offers.api';
 import type { OfferInput } from '../features/offers/offers.types';
 import { OfferForm } from '../features/offers/offer-form';
-import { useRole } from '../context/role-context';
+import { useAuth } from '../context/auth-context';
 
 type Step = 'search' | 'contact' | 'form';
 
 const ALL_ROLES: ContactRole[] = ['maitre_de_stage', 'responsable_administratif', 'encadrant_technique'];
 
 export function StudentProposalPage() {
-  const { role, entityId } = useRole();
+  const { role, entityId } = useAuth();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>('search');

@@ -74,11 +74,13 @@ export function createMsalEntraProvider(config: AuthConfig): EntraAuthProvider {
         throw new Error('entra_graph_me_failed');
       }
       const body = (await res.json()) as {
+        id: string;
         userPrincipalName: string;
         mail: string | null;
         displayName: string;
       };
       return {
+        oid: body.id,
         userPrincipalName: body.userPrincipalName,
         mail: body.mail,
         displayName: body.displayName,

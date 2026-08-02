@@ -1,10 +1,30 @@
 CREATE TABLE IF NOT EXISTS users (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  email         TEXT    NOT NULL UNIQUE,
-  role          TEXT    NOT NULL CHECK(role IN ('gestionnaire', 'lecteur', 'etudiant', 'entreprise')),
-  entity_id     INTEGER,
-  created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  email             TEXT    NOT NULL UNIQUE,
+  role              TEXT    NOT NULL CHECK(role IN ('gestionnaire', 'lecteur', 'etudiant', 'entreprise')),
+  entity_id         INTEGER,
+  entra_tenant_id   TEXT,
+  entra_object_id   TEXT,
+  display_name      TEXT,
+  created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at        TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Les index d'unicite sur les nouvelles colonnes users (tid+oid, email
+-- insensible a la casse) sont crees dans db.migrate.ts, apres l'ajout de
+-- colonnes sur les bases existantes : schema.sql seul echouerait sur une
+-- base ou ces colonnes n'existent pas encore (CREATE TABLE IF NOT EXISTS ne
+-- les ajoute pas retroactivement).
+
+-- Sessions Express persistees (jalon 2) : remplace le MemoryStore du pilote.
+-- expires_at en epoch ms pour un filtrage numerique simple.
+CREATE TABLE IF NOT EXISTS sessions (
+  sid         TEXT    PRIMARY KEY,
+  session     TEXT    NOT NULL,
+  expires_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 
 CREATE TABLE IF NOT EXISTS students (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,

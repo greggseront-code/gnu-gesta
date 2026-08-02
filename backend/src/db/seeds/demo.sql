@@ -3,14 +3,7 @@
 -- Toutes les insertions utilisent OR IGNORE pour être sûres en cas de re-run.
 
 -- ============================================================
--- 1. Utilisateurs admin
--- ============================================================
-INSERT OR IGNORE INTO users (email, role) VALUES
-  ('admin@ecole.be',   'gestionnaire'),
-  ('lecteur@ecole.be', 'lecteur');
-
--- ============================================================
--- 2. Étudiants (20 — mix belge/français + arabe + espagnol + slave)
+-- 1. Étudiants (20 — mix belge/français + arabe + espagnol + slave)
 -- ============================================================
 INSERT OR IGNORE INTO students (id, matricule, first_name, last_name, email, date_naissance) VALUES
   -- Belge / Français

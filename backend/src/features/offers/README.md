@@ -74,8 +74,10 @@ Voir aussi : `docs/data-model.md`.
 
 ## Permissions
 
-* `GET /api/offers` et `GET /api/offers/:id` : visibilité calculée selon rôle,
-  statut, auteur et candidatures.
+* `GET /api/offers` et `GET /api/offers/:id` : session authentifiée requise
+  (`gestionnaire`, `lecteur`, `etudiant` ou `entreprise` — pas d'accès
+  anonyme), puis visibilité calculée selon rôle, statut, auteur et
+  candidatures.
 * `POST /api/offers` : `gestionnaire`, `etudiant`, `entreprise`.
 * `POST /api/offers/:id/validate` : `gestionnaire`.
 * `POST /api/offers/:id/reject` : `gestionnaire`.

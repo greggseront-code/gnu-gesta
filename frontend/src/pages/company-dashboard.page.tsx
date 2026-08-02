@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useRole } from '../context/role-context';
+import { useAuth } from '../context/auth-context';
 import { getCompany, updateCompany, addContact } from '../features/companies/companies.api';
 import type { CompanyWithContacts, ContactRole } from '../features/companies/companies.types';
 import { CONTACT_ROLE_LABELS } from '../features/companies/companies.types';
@@ -19,7 +19,7 @@ function initials(firstName: string, lastName: string) {
 }
 
 export function CompanyDashboardPage() {
-  const { role, entityId } = useRole();
+  const { role, entityId } = useAuth();
 
   const [company, setCompany] = useState<CompanyWithContacts | null>(null);
   const [offers, setOffers] = useState<Offer[]>([]);

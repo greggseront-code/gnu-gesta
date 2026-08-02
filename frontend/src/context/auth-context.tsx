@@ -1,9 +1,15 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { getCurrentUser, logout as logoutRequest } from '../features/auth/auth.api';
-import type { CurrentAuthUser } from '../features/auth/auth.types';
+import { setCsrfToken, setUnauthorizedHandler } from '../lib/api-client';
+import type { CurrentAuthUser, BaseRole, EffectiveRole, AccountStatus } from '../features/auth/auth.types';
 
 interface AuthContextValue {
   user: CurrentAuthUser | null;
+  /** Rôle effectif (tient compte d'une incarnation gestionnaire active) : remplace l'ancien useRole().role. */
+  role: EffectiveRole | null;
+  entityId: number | null;
+  baseRole: BaseRole | null;
+  status: AccountStatus | null;
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
@@ -31,6 +37,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    setCsrfToken(user?.csrfToken ?? null);
+  }, [user]);
+
+  useEffect(() => {
+    // Un 401 sur n'importe quel appel API (session expirée côté serveur)
+    // efface l'utilisateur courant : les gardes de route renvoient alors vers /login.
+    setUnauthorizedHandler(() => setUser(null));
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
+  useEffect(() => {
     refresh();
   }, [refresh]);
 
@@ -40,7 +57,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, refresh, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        role: user?.role ?? null,
+        entityId: user?.entityId ?? null,
+        baseRole: user?.baseRole ?? null,
+        status: user?.status ?? null,
+        loading,
+        error,
+        refresh,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

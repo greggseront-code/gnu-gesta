@@ -5,10 +5,10 @@ import type { Offer } from '../features/offers/offers.types';
 import { StatusBadge } from '../components/status-badge';
 import { listCompanies } from '../features/companies/companies.api';
 import type { Company } from '../features/companies/companies.types';
-import { useRole } from '../context/role-context';
+import { useAuth } from '../context/auth-context';
 
 export function AdminOffersPage() {
-  const { role } = useRole();
+  const { role } = useAuth();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [companies, setCompanies] = useState<Map<number, string>>(new Map());
   const [loading, setLoading] = useState(true);

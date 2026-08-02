@@ -2,12 +2,15 @@ import request from 'supertest';
 import { app } from '../src/app';
 import { createTestDb, setDb } from '../src/db/db.connection';
 import type { Database } from 'better-sqlite3';
+import { loginAsGestionnaire, type AuthenticatedAgent } from './helpers/authenticated-agent';
 
 let db: Database;
+let manager: AuthenticatedAgent;
 
-beforeEach(() => {
+beforeEach(async () => {
   db = createTestDb();
   setDb(db);
+  manager = await loginAsGestionnaire();
 });
 
 afterEach(() => {
@@ -29,7 +32,7 @@ const validCompany = {
 
 // Helper: POST as gestionnaire
 const postCompany = (body: object) =>
-  request(app).post('/api/companies').set('x-role', 'gestionnaire').send(body);
+  manager.agent.post('/api/companies').set('x-csrf-token', manager.csrfToken).send(body);
 
 test('POST /api/companies crée une entreprise avec contacts', async () => {
   const res = await postCompany(validCompany);
@@ -65,7 +68,7 @@ test('GET /api/companies retourne la liste des entreprises', async () => {
   await postCompany(validCompany);
   await postCompany({ ...validCompany, name: 'Beta Inc', general_email: 'beta@beta.com' });
 
-  const res = await request(app).get('/api/companies');
+  const res = await manager.agent.get('/api/companies');
 
   expect(res.status).toBe(200);
   expect(res.body).toHaveLength(2);
@@ -75,7 +78,7 @@ test('GET /api/companies?search= filtre par nom', async () => {
   await postCompany(validCompany);
   await postCompany({ ...validCompany, name: 'Beta Inc', general_email: 'beta@beta.com' });
 
-  const res = await request(app).get('/api/companies?search=acme');
+  const res = await manager.agent.get('/api/companies?search=acme');
 
   expect(res.status).toBe(200);
   expect(res.body).toHaveLength(1);
@@ -95,7 +98,7 @@ test('POST /api/companies signale les doublons probables', async () => {
 test("GET /api/companies/:id retourne l'entreprise avec ses contacts", async () => {
   const created = (await postCompany(validCompany)).body;
 
-  const res = await request(app).get(`/api/companies/${created.id}`).set('x-role', 'gestionnaire');
+  const res = await manager.agent.get(`/api/companies/${created.id}`);
 
   expect(res.status).toBe(200);
   expect(res.body.id).toBe(created.id);
@@ -105,16 +108,16 @@ test("GET /api/companies/:id retourne l'entreprise avec ses contacts", async () 
 });
 
 test('GET /api/companies/:id avec un id inexistant retourne 404', async () => {
-  const res = await request(app).get('/api/companies/9999').set('x-role', 'gestionnaire');
+  const res = await manager.agent.get('/api/companies/9999');
   expect(res.status).toBe(404);
 });
 
 test('POST /api/companies/:id/contacts ajoute un contact et le retourne', async () => {
   const created = (await postCompany(validCompany)).body;
 
-  const res = await request(app)
+  const res = await manager.agent
     .post(`/api/companies/${created.id}/contacts`)
-    .set('x-role', 'gestionnaire')
+    .set('x-csrf-token', manager.csrfToken)
     .send({ first_name: 'Marie', last_name: 'Curie', email: 'marie@acme.com', roles: ['responsable_administratif'] });
 
   expect(res.status).toBe(201);
@@ -126,9 +129,9 @@ test('POST /api/companies/:id/contacts ajoute un contact et le retourne', async 
 test('POST /api/companies/:id/contacts sans email retourne 400', async () => {
   const created = (await postCompany(validCompany)).body;
 
-  const res = await request(app)
+  const res = await manager.agent
     .post(`/api/companies/${created.id}/contacts`)
-    .set('x-role', 'gestionnaire')
+    .set('x-csrf-token', manager.csrfToken)
     .send({ first_name: 'Marie', last_name: 'Curie', roles: ['maitre_de_stage'] });
 
   expect(res.status).toBe(400);
@@ -137,9 +140,9 @@ test('POST /api/companies/:id/contacts sans email retourne 400', async () => {
 test("PATCH /api/companies/:id met à jour les champs de l'entreprise", async () => {
   const created = (await postCompany(validCompany)).body;
 
-  const res = await request(app)
+  const res = await manager.agent
     .patch(`/api/companies/${created.id}`)
-    .set('x-role', 'gestionnaire')
+    .set('x-csrf-token', manager.csrfToken)
     .send({ name: 'Acme Corp Modifié', general_email: 'nouveau@acme.com' });
 
   expect(res.status).toBe(200);
@@ -152,7 +155,7 @@ test('GET /api/companies?duplicate_risk=true retourne les entreprises à risque 
   await postCompany({ ...validCompany, name: 'Acme Corporation', general_email: 'corp@acme.com' });
   await postCompany({ ...validCompany, name: 'Beta Inc', general_email: 'beta@beta.com' });
 
-  const res = await request(app).get('/api/companies?duplicate_risk=true');
+  const res = await manager.agent.get('/api/companies?duplicate_risk=true');
 
   expect(res.status).toBe(200);
   expect(res.body.length).toBeGreaterThanOrEqual(2);
@@ -160,4 +163,9 @@ test('GET /api/companies?duplicate_risk=true retourne les entreprises à risque 
   expect(names).toContain('Acme Corp');
   expect(names).toContain('Acme Corporation');
   expect(names).not.toContain('Beta Inc');
+});
+
+test('GET /api/companies anonyme reçoit 401', async () => {
+  const res = await request(app).get('/api/companies');
+  expect(res.status).toBe(401);
 });

@@ -94,6 +94,79 @@ sudo systemctl restart gnu-gesta-backend   # redémarrer après un changement de
 sudo journalctl -u gnu-gesta-backend -f    # logs en direct
 ```
 
+## Secrets authentification Microsoft Entra
+
+Le backend a besoin de `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`,
+`ENTRA_CLIENT_SECRET`, `ENTRA_REDIRECT_URI`, `APP_BASE_URL`,
+`SESSION_SECRET` et `GESTA_MANAGER_EMAIL` (voir
+`backend/src/features/auth/auth.config.ts` et `backend/.env.example`). En
+local, ces valeurs viennent de `backend/.env` (ignoré par Git). Sur le VPS,
+elles vivent dans `/etc/gnu-gesta/backend.env`.
+
+> **État actuel (période de développement, pas encore de mise en
+> production réelle)** : `ENTRA_CLIENT_SECRET` et `SESSION_SECRET` sur le VPS
+> réutilisent volontairement les mêmes valeurs que `backend/.env` en local —
+> décision explicite du 2026-08-02, tant qu'il n'y a pas de trafic réel à
+> isoler. `ENTRA_REDIRECT_URI` et `APP_BASE_URL` restent en revanche
+> obligatoirement différents (`https://gng.seront.be/...` contre
+> `http://localhost:5173/...`), ce n'est pas une question de secret mais
+> l'URL réellement utilisée par chaque environnement. Voir
+> `docs/production-readiness.md` pour la décision à reprendre avant une
+> vraie mise en production (secret dédié, `SESSION_SECRET` dédié, etc.).
+
+Création initiale sur le VPS :
+
+```bash
+sudo install -m 600 -o ubuntu -g ubuntu /dev/null /etc/gnu-gesta/backend.env
+sudo nano /etc/gnu-gesta/backend.env   # renseigner les 7 variables, voir backend/.env.example
+```
+
+* Permissions `600`, propriétaire `ubuntu` (l'utilisateur sous lequel tourne
+  le service systemd) : seul ce compte peut lire le fichier.
+* `ENTRA_REDIRECT_URI=https://gng.seront.be/api/auth/callback` et
+  `APP_BASE_URL=https://gng.seront.be` : l'URI de production est déjà
+  enregistrée dans l'inscription d'application Entra, elle n'a pas besoin
+  d'être recréée.
+* `ENTRA_CLIENT_SECRET` et `SESSION_SECRET` : pour l'instant, copier les
+  mêmes valeurs que `backend/.env` local (voir encadré ci-dessus).
+
+Le service systemd charge ce fichier via
+`EnvironmentFile=-/etc/gnu-gesta/backend.env` (voir
+`deploy/systemd/gnu-gesta-backend.service`) et exécute
+`ExecStartPre=.../tsx scripts/auth-config-check.ts` avant chaque
+(re)démarrage : une configuration absente ou invalide fait échouer le
+démarrage du service avec un message clair dans les logs
+(`journalctl -u gnu-gesta-backend`), **sans jamais afficher les valeurs**
+elles-mêmes. `backend/src/app.ts` applique la même règle au niveau
+applicatif via `isProductionLikeEnvironment()` : `loadAuthConfig()` (variante
+qui lève une exception) est utilisé au lieu de la variante silencieuse dès
+que `NODE_ENV` vaut `production` ou `staging`.
+
+Le cookie de session utilise `Secure` et `trust proxy` (Express) dès que
+`isProductionLikeEnvironment()` est vrai, pour respecter l'en-tête
+`X-Forwarded-Proto` transmis par Nginx (voir
+`deploy/nginx/gng.seront.be.conf`).
+
+### Rotation du secret client
+
+Le secret client Entra (`ENTRA_CLIENT_SECRET`), actuellement partagé entre
+local et VPS (voir encadré ci-dessus), a une date d'expiration fixée à sa
+création dans le portail Azure (inscription d'application GNG, section
+"Certificats et secrets") : à vérifier et noter dans
+`docs/production-readiness.md`, indépendamment de la décision de le séparer
+ou non par environnement. Avant expiration :
+
+1. Créer un nouveau secret client dans le portail Azure (sans supprimer
+   l'ancien immédiatement, pour éviter une coupure).
+2. Mettre à jour `ENTRA_CLIENT_SECRET` dans `/etc/gnu-gesta/backend.env`.
+3. `sudo systemctl restart gnu-gesta-backend` (ou redéployer via
+   `deploy.sh`, qui redémarre le service de toute façon).
+4. Vérifier `GET https://gng.seront.be/api/health` puis une connexion réelle,
+   avant de supprimer l'ancien secret dans le portail Azure.
+
+Cette rotation reste une opération manuelle : aucune automatisation n'existe
+pour l'instant.
+
 ## Frontend : build statique
 
 Le frontend est buildé en statique (`npm run build` dans `frontend/`, qui
@@ -258,14 +331,16 @@ volontaire.
 
 ## Environnement runtime : production vs staging
 
-Le pilote authentification Microsoft Entra
-(`docs/specs/2026-07-31-authentification-microsoft-entra-v1.md`) refuse de
-démarrer avec `NODE_ENV=production` tant que le store de session SQLite du
-jalon 2 n'existe pas (`assertPilotEnvironmentAllowed()` dans
-`backend/src/features/auth/auth.config.ts`). Le VPS n'héberge pour l'instant
-que des données fictives : `NODE_ENV` peut donc être temporairement basculé
-sur `staging` pour tester le pilote en conditions réelles sur ce même VPS,
-sans en créer un second.
+Depuis le jalon 2 de l'authentification Microsoft Entra
+(`docs/specs/2026-07-31-authentification-microsoft-entra-v1.md`), les
+sessions sont persistées dans SQLite (`backend/src/features/auth/session.store.ts`)
+et `production`/`staging` sont traités de façon identique par
+`isProductionLikeEnvironment()` (cookie `Secure`, `trust proxy`, config Entra
+obligatoire au démarrage) : il n'existe plus de garde bloquant
+`NODE_ENV=production`. `staging` reste disponible comme environnement de
+test intermédiaire sur ce même VPS (mêmes secrets, mêmes garanties), utile
+pour valider un changement avant de le considérer comme la version de
+référence, sans avoir à héberger un second environnement.
 
 ```bash
 ./deploy/deploy-prod.sh --env staging      # bascule et deploie

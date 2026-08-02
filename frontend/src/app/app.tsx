@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { RoleProvider, useRole } from '../context/role-context';
-import { AuthProvider } from '../context/auth-context';
+import { AuthProvider, useAuth } from '../context/auth-context';
 import { LoginPage } from '../pages/login.page';
 import { AuthCheckPage } from '../pages/auth-check.page';
+import { AccountNotLinkedPage } from '../pages/account-not-linked.page';
 import { AppLayout } from '../components/app-layout';
 import { HomePage } from '../pages/home.page';
 import { CompaniesPage } from '../pages/companies.page';
@@ -14,39 +14,46 @@ import { StudentProposalPage } from '../pages/student-proposal.page';
 import { AdminOffersPage } from '../pages/admin-offers.page';
 import { AdminCompanyFormPage } from '../pages/admin-company-form.page';
 import { AdminCompanyDetailPage } from '../pages/admin-company-detail.page';
-import { RoleSelectPage } from '../pages/role-select.page';
 import { StudentsPage } from '../pages/students.page';
 import { StudentsImportPage } from '../pages/students-import.page';
 import { CompanyDashboardPage } from '../pages/company-dashboard.page';
 import { StudentApplicationsPage } from '../pages/student-applications.page';
 import { AdminApplicationsPage } from '../pages/admin-applications.page';
+import { ImpersonationSelectPage } from '../pages/impersonation-select.page';
 
-function RoleGate({ children }: { children: ReactNode }) {
-  const { role } = useRole();
-  if (!role) return <Navigate to="/select-role" replace />;
+function AuthGate({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) return <p className="text-muted" style={{ padding: '2rem' }}>Chargement…</p>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.status === 'student_not_imported') return <Navigate to="/account-not-linked" replace />;
   return <>{children}</>;
 }
 
 function RequireWrite({ children }: { children: ReactNode }) {
-  const { role } = useRole();
+  const { role } = useAuth();
   if (role === 'lecteur') return <Navigate to="/companies" replace />;
+  return <>{children}</>;
+}
+
+function RequireGestionnaireBase({ children }: { children: ReactNode }) {
+  const { baseRole } = useAuth();
+  if (baseRole !== 'gestionnaire') return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
 function AppRoutes() {
   return (
     <Routes>
-      {/* Pilote authentification (jalon 1) : isole du reste de l'app, ne remplace pas encore /select-role. */}
-      <Route path="/login" element={<AuthProvider><LoginPage /></AuthProvider>} />
-      <Route path="/auth-check" element={<AuthProvider><AuthCheckPage /></AuthProvider>} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/auth-check" element={<AuthCheckPage />} />
+      <Route path="/account-not-linked" element={<AccountNotLinkedPage />} />
 
-      <Route path="/select-role" element={<RoleSelectPage />} />
       <Route
         path="/"
         element={
-          <RoleGate>
+          <AuthGate>
             <AppLayout />
-          </RoleGate>
+          </AuthGate>
         }
       >
         <Route index element={<HomePage />} />
@@ -64,6 +71,14 @@ function AppRoutes() {
         <Route path="company/dashboard" element={<CompanyDashboardPage />} />
         <Route path="student/applications" element={<StudentApplicationsPage />} />
         <Route path="admin/applications" element={<AdminApplicationsPage />} />
+        <Route
+          path="impersonate"
+          element={
+            <RequireGestionnaireBase>
+              <ImpersonationSelectPage />
+            </RequireGestionnaireBase>
+          }
+        />
         <Route path="*" element={<p>Page non trouvée.</p>} />
       </Route>
     </Routes>
@@ -73,9 +88,9 @@ function AppRoutes() {
 export function App() {
   return (
     <BrowserRouter>
-      <RoleProvider>
+      <AuthProvider>
         <AppRoutes />
-      </RoleProvider>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

@@ -84,7 +84,7 @@ export function loadAuthConfigOrNull(): AuthConfig | null {
 
 let devSessionSecret: string | null = null;
 
-/** Ephemeral secret used only when the real config is missing outside tests/production. */
+/** Ephemeral secret used only when the real config is missing outside tests/production/staging. */
 export function getFallbackSessionSecret(): string {
   if (!devSessionSecret) {
     devSessionSecret = randomBytes(32).toString('hex');
@@ -92,16 +92,7 @@ export function getFallbackSessionSecret(): string {
   return devSessionSecret;
 }
 
-/**
- * Le pilote utilise un MemoryStore de session (jalon 1). Il ne doit jamais
- * tourner avec NODE_ENV=production tant que le store SQLite du jalon 2 n'a
- * pas remplace ce MemoryStore.
- */
-export function assertPilotEnvironmentAllowed(): void {
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      'Le pilote authentification (MemoryStore) refuse de demarrer avec NODE_ENV=production. ' +
-        'Voir docs/plans/2026-07-31-authentification-microsoft-entra-v1.md (jalon 2 requis avant tout deploiement).',
-    );
-  }
+/** production et staging partagent le meme domaine HTTPS (voir docs/deployment.md) : la config Entra y est obligatoire. */
+export function isProductionLikeEnvironment(): boolean {
+  return process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging';
 }

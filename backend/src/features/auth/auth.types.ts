@@ -1,5 +1,7 @@
 /** Claims Microsoft retenus apres l'appel Graph /me, sans jeton. */
 export interface EntraProfile {
+  /** Object id Microsoft (`id` sur la ressource Graph User) : partie immuable de l'identite avec le tenant id. */
+  oid: string;
   userPrincipalName: string;
   mail: string | null;
   displayName: string;
@@ -20,11 +22,34 @@ export interface PendingAuthState {
   codeVerifier: string;
 }
 
+/** Rôle de base calcule a chaque connexion a partir de l'identite Microsoft verifiee. */
+export type BaseRole = 'gestionnaire' | 'etudiant' | 'lecteur';
+
+/** Statut d'un compte etudiant vis-a-vis du referentiel `students`. */
+export type AccountStatus = 'ok' | 'student_not_imported';
+
 /**
- * Session utilisateur du pilote uniquement : seul le gestionnaire exact
- * obtient un role metier. Tout autre compte du tenant est authentifie mais
- * marque `pilot_not_manager`, sans role ni entityId.
+ * Identite de session complete (cible post-pilote). `entityId` porte
+ * l'`id` de la fiche `students` liee quand `baseRole === 'etudiant'` ;
+ * `null` sinon, y compris quand `status === 'student_not_imported'`.
  */
-export type PilotSessionUser =
-  | { kind: 'gestionnaire'; displayName: string; email: string }
-  | { kind: 'pilot_not_manager'; displayName: string; email: string };
+export interface SessionUser {
+  tid: string;
+  oid: string;
+  email: string;
+  displayName: string;
+  baseRole: BaseRole;
+  entityId: number | null;
+  status: AccountStatus;
+}
+
+export type ImpersonationKind = 'student' | 'company';
+
+/**
+ * Mode d'incarnation temporaire, reserve au gestionnaire (jalon 5). Stocke
+ * uniquement dans la session : ne modifie jamais `users` ni `students`.
+ */
+export interface ImpersonationState {
+  kind: ImpersonationKind;
+  entityId: number;
+}

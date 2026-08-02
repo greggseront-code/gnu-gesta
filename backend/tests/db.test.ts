@@ -18,6 +18,7 @@ test('schema creates all required tables', () => {
   const names = tables.map((t) => t.name);
 
   expect(names).toContain('users');
+  expect(names).toContain('sessions');
   expect(names).toContain('students');
   expect(names).toContain('companies');
   expect(names).toContain('company_contacts');

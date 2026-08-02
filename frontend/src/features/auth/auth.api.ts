@@ -1,4 +1,5 @@
 import type { CurrentAuthUser } from './auth.types';
+import { apiFetch } from '../../lib/api-client';
 
 const API_BASE = '/api';
 
@@ -15,5 +16,13 @@ export async function getCurrentUser(): Promise<CurrentAuthUser | null> {
 }
 
 export async function logout(): Promise<void> {
-  await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' });
+  await apiFetch('/auth/logout', { method: 'POST' });
+}
+
+export async function activateImpersonation(kind: 'student' | 'company', entityId: number): Promise<void> {
+  await apiFetch('/auth/impersonation', { method: 'POST', body: JSON.stringify({ kind, entityId }) });
+}
+
+export async function deactivateImpersonation(): Promise<void> {
+  await apiFetch('/auth/impersonation', { method: 'DELETE' });
 }

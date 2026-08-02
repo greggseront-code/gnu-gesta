@@ -1,17 +1,21 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
+import type { Database } from 'better-sqlite3';
 import { app } from '../src/app';
+import { createTestDb, setDb } from '../src/db/db.connection';
 import { setEntraProvider } from '../src/features/auth/entra.client';
 import type { EntraAuthProvider, AuthCodeUrlRequest, TokenExchangeRequest } from '../src/features/auth/entra.client';
 import type { AcquiredEntraToken, EntraProfile } from '../src/features/auth/auth.types';
 
 const REAL_TENANT_ID = 'test-tenant-id'; // matches TEST_CONFIG in auth.config.ts under NODE_ENV=test
 const MANAGER_PROFILE: EntraProfile = {
+  oid: 'oid-manager',
   userPrincipalName: 'gregory.seront@vinci.be',
   mail: 'gregory.seront@vinci.be',
   displayName: 'Gregory Seront',
 };
 const OTHER_PROFILE: EntraProfile = {
+  oid: 'oid-jane',
   userPrincipalName: 'jane.doe@vinci.be',
   mail: 'jane.doe@vinci.be',
   displayName: 'Jane Doe',
@@ -49,10 +53,16 @@ function extractState(location: string): string {
   return new URL(location).searchParams.get('state') ?? '';
 }
 
-describe('auth pilote — gestionnaire uniquement', () => {
+describe('auth — connexion Microsoft Entra', () => {
+  let db: Database;
+
   beforeEach(() => {
+    db = createTestDb();
+    setDb(db);
     setEntraProvider(new FakeEntraProvider(REAL_TENANT_ID, MANAGER_PROFILE));
   });
+
+  afterEach(() => db.close());
 
   it('GET /api/auth/me returns 401 before login', async () => {
     const res = await request(app).get('/api/auth/me');
@@ -73,11 +83,16 @@ describe('auth pilote — gestionnaire uniquement', () => {
 
     const meRes = await agent.get('/api/auth/me');
     expect(meRes.status).toBe(200);
-    expect(meRes.body).toEqual({
+    expect(meRes.body).toMatchObject({
       name: 'Gregory Seront',
       email: 'gregory.seront@vinci.be',
+      baseRole: 'gestionnaire',
       role: 'gestionnaire',
+      entityId: null,
+      status: 'ok',
     });
+    expect(typeof meRes.body.csrfToken).toBe('string');
+    expect(meRes.body.csrfToken.length).toBeGreaterThan(0);
   });
 
   it('rejects a callback with a mismatched state', async () => {
@@ -123,7 +138,7 @@ describe('auth pilote — gestionnaire uniquement', () => {
     expect(meRes.status).toBe(401);
   });
 
-  it('authenticates but does not grant a role to a non-manager account of the tenant', async () => {
+  it('authenticates a non-manager, non-student account of the tenant as lecteur', async () => {
     setEntraProvider(new FakeEntraProvider(REAL_TENANT_ID, OTHER_PROFILE));
     const agent = request.agent(app);
     const loginRes = await agent.get('/api/auth/login');
@@ -135,10 +150,13 @@ describe('auth pilote — gestionnaire uniquement', () => {
 
     const meRes = await agent.get('/api/auth/me');
     expect(meRes.status).toBe(200);
-    expect(meRes.body).toEqual({
+    expect(meRes.body).toMatchObject({
       name: 'Jane Doe',
       email: 'jane.doe@vinci.be',
-      status: 'pilot_not_manager',
+      baseRole: 'lecteur',
+      role: 'lecteur',
+      entityId: null,
+      status: 'ok',
     });
   });
 
@@ -151,16 +169,13 @@ describe('auth pilote — gestionnaire uniquement', () => {
     const meBefore = await agent.get('/api/auth/me');
     expect(meBefore.status).toBe(200);
 
-    const logoutRes = await agent.post('/api/auth/logout');
+    const logoutRes = await agent
+      .post('/api/auth/logout')
+      .set('x-csrf-token', meBefore.body.csrfToken);
     expect(logoutRes.status).toBe(204);
 
     const meAfter = await agent.get('/api/auth/me');
     expect(meAfter.status).toBe(401);
-  });
-
-  it('does not leave a business route affected by the pilot session', async () => {
-    const res = await request(app).get('/api/companies');
-    expect(res.status).toBe(200);
   });
 
   it('clears the MSAL token cache after reading the profile, on success and on rejection', async () => {

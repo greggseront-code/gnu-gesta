@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom';
 import { listVisibleOffers, listMyCompanyOffers, listMyStudentOffers } from '../features/offers/offers.api';
 import type { Offer } from '../features/offers/offers.types';
 import { OfferCard } from '../features/offers/offer-card';
-import { useRole } from '../context/role-context';
+import { useAuth } from '../context/auth-context';
 
 export function OffersPage() {
-  const { role } = useRole();
+  const { role } = useAuth();
   const [offers, setOffers] = useState<Offer[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);

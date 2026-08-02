@@ -3,12 +3,12 @@ import { useParams, Link } from 'react-router-dom';
 import { getOffer, validateOffer, rejectOffer, markUnavailable } from '../features/offers/offers.api';
 import type { Offer } from '../features/offers/offers.types';
 import { StatusBadge } from '../components/status-badge';
-import { useRole } from '../context/role-context';
+import { useAuth } from '../context/auth-context';
 import { applyToOffer } from '../features/applications/applications.api';
 
 export function OfferDetailsPage() {
   const { id } = useParams<{ id: string }>();
-  const { role, entityId } = useRole();
+  const { role, entityId } = useAuth();
   const [offer, setOffer] = useState<Offer | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);

@@ -1,9 +1,11 @@
 import 'express-session';
-import type { PendingAuthState, PilotSessionUser } from '../features/auth/auth.types';
+import type { ImpersonationState, PendingAuthState, SessionUser } from '../features/auth/auth.types';
 
 declare module 'express-session' {
   interface SessionData {
     pendingAuth?: PendingAuthState;
-    user?: PilotSessionUser;
+    user?: SessionUser;
+    impersonation?: ImpersonationState;
+    csrfToken?: string;
   }
 }

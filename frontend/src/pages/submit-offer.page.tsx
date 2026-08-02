@@ -5,12 +5,12 @@ import type { CompanyContact } from '../features/companies/companies.types';
 import { createOffer, updateOffer, getOffer, uploadOfferAttachment } from '../features/offers/offers.api';
 import type { Offer, OfferInput } from '../features/offers/offers.types';
 import { OfferForm } from '../features/offers/offer-form';
-import { useRole } from '../context/role-context';
+import { useAuth } from '../context/auth-context';
 
 export function SubmitOfferPage() {
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
-  const { role, entityId } = useRole();
+  const { role, entityId } = useAuth();
   const navigate = useNavigate();
 
   const [contacts, setContacts] = useState<CompanyContact[]>([]);

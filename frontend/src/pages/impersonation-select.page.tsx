@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useRole, type Role } from '../context/role-context';
+import { useAuth } from '../context/auth-context';
+import { activateImpersonation } from '../features/auth/auth.api';
 import { listCompanies } from '../features/companies/companies.api';
 import { apiFetch } from '../lib/api-client';
 import type { Company } from '../features/companies/companies.types';
@@ -12,18 +13,16 @@ interface Student {
   email: string;
 }
 
-type Step = 'select' | 'etudiant' | 'entreprise';
+type Step = 'select' | 'student' | 'company';
 
-const ROLES = [
-  { role: 'gestionnaire' as Role, title: 'Gestionnaire', desc: 'Accès complet à toutes les fonctionnalités.' },
-  { role: 'lecteur' as Role, title: 'Lecteur', desc: 'Consultation uniquement, sans modification.' },
-  { role: 'etudiant' as Role, title: 'Étudiant', desc: 'Recherche de stage et suivi de candidatures.' },
-  { role: 'entreprise' as Role, title: 'Entreprise', desc: "Dépôt d'offres et suivi des candidats." },
-];
-
-export function RoleSelectPage() {
+/**
+ * Réservée au gestionnaire (voir RequireGestionnaireBase dans app.tsx) :
+ * reprend le parcours de recherche de l'ancien role-select.page.tsx, mais
+ * active un mode d'incarnation côté backend au lieu de choisir un rôle local.
+ */
+export function ImpersonationSelectPage() {
   const navigate = useNavigate();
-  const { setRole } = useRole();
+  const { refresh } = useAuth();
 
   const [step, setStep] = useState<Step>('select');
   const [search, setSearch] = useState('');
@@ -31,9 +30,10 @@ export function RoleSelectPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(false);
   const [empty, setEmpty] = useState(false);
+  const [activating, setActivating] = useState(false);
 
   useEffect(() => {
-    if (step === 'etudiant') {
+    if (step === 'student') {
       setLoading(true);
       setEmpty(false);
       apiFetch<Student[]>('/students')
@@ -41,7 +41,7 @@ export function RoleSelectPage() {
         .catch(() => { setStudents([]); setEmpty(true); })
         .finally(() => setLoading(false));
     }
-    if (step === 'entreprise') {
+    if (step === 'company') {
       setLoading(true);
       setEmpty(false);
       listCompanies()
@@ -51,20 +51,14 @@ export function RoleSelectPage() {
     }
   }, [step]);
 
-  function pickSimpleRole(role: Role) {
-    setRole(role);
-    navigate('/');
-  }
-
-  function handleCard(role: Role) {
-    if (role === 'gestionnaire' || role === 'lecteur') {
-      pickSimpleRole(role);
-    } else {
-      setSearch('');
-      setStudents([]);
-      setCompanies([]);
-      setEmpty(false);
-      setStep(role);
+  async function activate(kind: 'student' | 'company', entityId: number) {
+    setActivating(true);
+    try {
+      await activateImpersonation(kind, entityId);
+      await refresh();
+      navigate('/');
+    } finally {
+      setActivating(false);
     }
   }
 
@@ -82,28 +76,32 @@ export function RoleSelectPage() {
           <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '0.5rem' }}>
             gnu-gesta
           </div>
-          <h1 className="role-select-title">Choisissez votre profil</h1>
-          <p className="role-select-subtitle">Sélectionnez votre rôle pour accéder à l'application.</p>
+          <h1 className="role-select-title">Voir comme…</h1>
+          <p className="role-select-subtitle">
+            Mode temporaire réservé au gestionnaire : votre identité de base reste disponible à tout moment.
+          </p>
         </div>
 
         {step === 'select' && (
           <div className="role-grid">
-            {ROLES.map(({ role, title, desc }) => (
-              <button key={role} className="role-btn" onClick={() => handleCard(role)}>
-                <span className="role-btn-title">{title}</span>
-                <span className="role-btn-desc">{desc}</span>
-              </button>
-            ))}
+            <button className="role-btn" onClick={() => { setSearch(''); setStep('student'); }}>
+              <span className="role-btn-title">Voir comme un étudiant</span>
+              <span className="role-btn-desc">Recherche de stage et suivi de candidatures.</span>
+            </button>
+            <button className="role-btn" onClick={() => { setSearch(''); setStep('company'); }}>
+              <span className="role-btn-title">Voir comme une entreprise</span>
+              <span className="role-btn-desc">Dépôt d'offres et suivi des candidats.</span>
+            </button>
           </div>
         )}
 
-        {(step === 'etudiant' || step === 'entreprise') && (
+        {(step === 'student' || step === 'company') && (
           <div className="card">
             <div className="card-header">
               <span className="card-title">
-                {step === 'etudiant' ? 'Sélectionner votre profil étudiant' : 'Sélectionner votre entreprise'}
+                {step === 'student' ? 'Sélectionner un étudiant' : 'Sélectionner une entreprise'}
               </span>
-              <button className="btn btn-secondary btn-sm" onClick={() => setStep('select')}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setStep('select')} disabled={activating}>
                 ← Retour
               </button>
             </div>
@@ -111,7 +109,7 @@ export function RoleSelectPage() {
               <input
                 className="search-input"
                 style={{ width: '100%', marginBottom: '1rem' }}
-                placeholder={step === 'etudiant' ? 'Rechercher par nom ou email…' : 'Rechercher une entreprise…'}
+                placeholder={step === 'student' ? 'Rechercher par nom ou email…' : 'Rechercher une entreprise…'}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 autoFocus
@@ -119,21 +117,20 @@ export function RoleSelectPage() {
 
               {loading && <p className="text-muted">Chargement…</p>}
 
-              {!loading && empty && step === 'etudiant' && (
-                <p className="text-muted">
-                  Aucun étudiant enregistré. Demandez à votre gestionnaire d'importer la liste.
-                </p>
+              {!loading && empty && step === 'student' && (
+                <p className="text-muted">Aucun étudiant importé.</p>
               )}
-              {!loading && empty && step === 'entreprise' && (
+              {!loading && empty && step === 'company' && (
                 <p className="text-muted">Aucune entreprise enregistrée.</p>
               )}
 
-              {!loading && step === 'etudiant' && filteredStudents.length > 0 && (
+              {!loading && step === 'student' && filteredStudents.length > 0 && (
                 <div className="contact-list">
                   {filteredStudents.map((s) => (
                     <button
                       key={s.id}
-                      onClick={() => { setRole('etudiant', s.id); navigate('/'); }}
+                      onClick={() => activate('student', s.id)}
+                      disabled={activating}
                       style={{ all: 'unset', cursor: 'pointer', width: '100%' }}
                     >
                       <div className="contact-item">
@@ -150,12 +147,13 @@ export function RoleSelectPage() {
                 </div>
               )}
 
-              {!loading && step === 'entreprise' && filteredCompanies.length > 0 && (
+              {!loading && step === 'company' && filteredCompanies.length > 0 && (
                 <div className="contact-list">
                   {filteredCompanies.map((c) => (
                     <button
                       key={c.id}
-                      onClick={() => { setRole('entreprise', c.id); navigate('/'); }}
+                      onClick={() => activate('company', c.id)}
+                      disabled={activating}
                       style={{ all: 'unset', cursor: 'pointer', width: '100%' }}
                     >
                       <div className="contact-item">

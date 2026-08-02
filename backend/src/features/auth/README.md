@@ -1,109 +1,157 @@
 # Auth - Backend
 
-> Etat actuel : jalon 1 (pilote gestionnaire uniquement). Cette feature sera
-> etendue par les jalons suivants du plan lie ci-dessous ; ce README sera mis
-> a jour a chaque jalon plutot que recree.
+> État : cible complète (jalons 1 à 5 du plan). Authentification Microsoft
+> Entra, sessions SQLite, rôles gestionnaire/étudiant/lecteur, incarnations
+> temporaires gestionnaire, CSRF. `entreprise` n'existe qu'en tant que rôle
+> effectif d'incarnation : aucune authentification réelle des entreprises
+> n'est implémentée (hors périmètre, voir spec).
 
 ## Endpoints
 
 * `GET /api/auth/login` : redirige vers Microsoft Entra (state, nonce, PKCE).
-* `GET /api/auth/callback` : retour Microsoft Entra, etablit ou rejette la
-  session pilote.
-* `GET /api/auth/me` : identite de la session pilote courante.
-* `POST /api/auth/logout` : deconnexion locale (session GNG uniquement).
+* `GET /api/auth/callback` : retour Microsoft Entra, établit la session ou
+  redirige vers `/auth-check?error=...`.
+* `GET /api/auth/me` : identité de la session courante — `name`, `email`,
+  `baseRole`, `role` (effectif), `entityId` (effectif), `status`,
+  `impersonation`, `csrfToken`. `401` sans session.
+* `POST /api/auth/logout` : déconnexion locale (session GNG uniquement, pas
+  de déconnexion Microsoft globale). Protégé par CSRF.
+* `POST /api/auth/impersonation` : `{ kind: 'student' | 'company', entityId }`
+  — active un mode temporaire. Réservé à `baseRole === 'gestionnaire'`, `403`
+  sinon. `404` si l'entité n'existe pas. Protégé par CSRF.
+* `DELETE /api/auth/impersonation` : quitte le mode actif, restaure le rôle
+  de base. Protégé par CSRF.
 
 ## Modèle de domaine
 
-* `PilotSessionUser` : soit `{ kind: 'gestionnaire', displayName, email }`,
-  soit `{ kind: 'pilot_not_manager', displayName, email }`. Aucune autre
-  forme n'existe encore : les rôles `etudiant`, `lecteur` et les
-  incarnations arrivent au jalon 3 et au jalon 5.
-* `PendingAuthState` (`state`, `nonce`, `codeVerifier`) : temporaire, stocké
-  dans la session Express le temps de l'aller-retour Microsoft, effacé après
-  le callback (succès ou échec).
+* `SessionUser` (`auth.types.ts`) : `tid`, `oid` (identité Microsoft
+  immuable), `email` (`userPrincipalName` vérifié), `displayName`,
+  `baseRole` (`gestionnaire` | `etudiant` | `lecteur`), `entityId` (fiche
+  `students` liée, ou `null`), `status` (`ok` | `student_not_imported`).
+  Stocké dans `req.session.user`.
+* `ImpersonationState` : `{ kind: 'student' | 'company', entityId }`, stocké
+  dans `req.session.impersonation`, absent hors incarnation.
+* `PendingAuthState` : `state`/`nonce`/`codeVerifier` temporaires, effacés
+  après le callback (succès ou échec).
+* `req.auth` (`middlewares/auth-context.middleware.ts`) : vue calculée pour
+  les routes métier — `authenticated`, `baseRole`, `role` (effectif, tient
+  compte d'une incarnation active), `entityId` (effectif).
 
 ## Règles métier
 
-* Seule l'adresse exacte `GESTA_MANAGER_EMAIL` (normalisée en minuscules,
-  comparée au `userPrincipalName`) obtient `kind: 'gestionnaire'`. Tout autre
-  compte authentifié du tenant reçoit `kind: 'pilot_not_manager'` : la
-  session existe mais aucun rôle métier n'est accordé.
-* Un jeton d'un autre tenant que `ENTRA_TENANT_ID` est rejeté avant tout appel
-  Graph.
-* Le cache MSAL (`ConfidentialClientApplication.getTokenCache()`) est purgé
-  pour le compte concerné juste après l'appel Graph `/me`, que le callback
-  réussisse ou échoue (`try`/`finally` dans `auth.service.ts`). Aucun jeton
-  Microsoft n'est conservé au-delà de cet appel, ni dans la session, ni dans
-  les logs.
-* L'identifiant de session est régénéré après une connexion réussie.
+* Rôle de base, dans cet ordre : adresse exacte `GESTA_MANAGER_EMAIL`
+  (normalisée, comparée à `userPrincipalName`) → `gestionnaire` ; domaine
+  exact `student.vinci.be` (partie après le dernier `@`) → `etudiant` ; tout
+  autre compte du tenant → `lecteur`. Recalculé à **chaque** connexion
+  (`auth.service.classifyBaseRole`). `mail` n'élève jamais seul au rôle
+  gestionnaire ou étudiant.
+* Liaison étudiante (`auth.service.linkStudentEntity`) : recherche
+  `students.email` égal à `userPrincipalName` (insensible à la casse), puis
+  à `mail` uniquement s'il diffère du UPN. Ne crée jamais de fiche. Absence
+  de correspondance → `status: 'student_not_imported'`, `entityId: null`,
+  `role` effectif `null` (bloqué sur toutes les routes métier, mais
+  authentifié : `401` ne s'applique pas, `403` si une route est appelée).
+* Un jeton d'un autre tenant que `ENTRA_TENANT_ID` est rejeté avant tout
+  appel Graph. Le cache MSAL est purgé après `getMe()`, succès ou échec
+  (`try`/`finally`). Aucun jeton Microsoft n'est conservé au-delà de cet
+  appel, ni dans la session, ni dans les logs, ni dans `users`.
+  `upsertIdentity()` ne persiste que l'identité (tid/oid/email/nom/rôle),
+  jamais de jeton.
+* L'identifiant de session est régénéré après une connexion réussie, ce qui
+  efface aussi toute incarnation précédente. Un nouveau jeton CSRF est
+  généré à chaque connexion.
+* Incarnations : réservées à `baseRole === 'gestionnaire'` ; un seul mode
+  actif à la fois (un second appel remplace le précédent) ; l'entité ciblée
+  doit exister (`students`/`companies`) ; stockées uniquement dans la
+  session, ne modifient jamais `users` ni `students`/`companies` ; effacées
+  au logout et à toute nouvelle connexion.
 * Seule la permission déléguée `User.Read` est demandée (scopes `openid`,
   `profile`, `email`, `User.Read`).
 
 ## Accès données
 
-* Aucune table SQL n'est utilisée par le pilote. `users`/`sessions` arrivent
-  au jalon 2 (voir le plan).
-* Session : `express-session` avec `MemoryStore` (par défaut, explicite dans
-  `app.ts`). Volontairement non persistant et non éligible à la production
-  tant que le store SQLite du jalon 2 n'existe pas — voir
-  `assertPilotEnvironmentAllowed()` dans `auth.config.ts`, qui refuse de
-  démarrer avec `NODE_ENV=production`.
+* `users` : `auth.queries.upsertIdentity()` crée/actualise par
+  `(entra_tenant_id, entra_object_id)`. `role`/`entity_id` y sont un
+  instantané du dernier login (audit), jamais relus pour autoriser une
+  requête.
+* `students` : `auth.queries.findStudentIdByEmail()` (lecture seule,
+  `COLLATE NOCASE`).
+* `companies`/`students` : vérification d'existence lors d'une incarnation
+  (`students.queries.findStudentById`, `companies.queries.findCompanyById`).
+* Session : `express-session` avec `session.store.ts`
+  (`SqliteSessionStore`, table `sessions`), 8h renouvelable
+  (`rolling: true`), `HttpOnly`, `SameSite=Lax`, `Secure` en
+  production/staging (`trust proxy` activé, voir `app.ts`).
 
 Voir aussi : `docs/data-model.md`.
 
 ## Permissions
 
-* Toutes les routes `/api/auth/*` sont publiques au sens transport (pas de
-  `x-role` requis) : l'authentification elle-même est le mécanisme d'accès.
-* Le pilote ne protège aucune route métier existante (`companies`,
-  `students`, `offers`, `applications`) : celles-ci restent gouvernées par
-  `x-role`/`x-entity-id` jusqu'au jalon 4.
+* `GET/POST /api/auth/login`, `/callback`, `/me` : publiques au sens
+  transport (l'authentification elle-même est le mécanisme d'accès).
+* `POST /api/auth/logout` : nécessite une session (sinon la déconnexion est
+  un no-op côté serveur) et un jeton CSRF valide.
+* `POST /DELETE /api/auth/impersonation` : `baseRole === 'gestionnaire'`
+  uniquement, jeton CSRF valide.
+* Toutes les routes métier (`companies`, `students`, `offers`,
+  `applications`) exigent une session : `401` sans session, `403` avec
+  session insuffisante (rôle manquant ou `student_not_imported`). Voir les
+  README de ces features pour le détail par route.
+* CSRF (`middlewares/csrf.middleware.ts`) : toute requête `POST`/`PATCH`/
+  `PUT`/`DELETE` avec une session active doit porter l'en-tête
+  `x-csrf-token` égal à `req.session.csrfToken`. Une requête anonyme
+  traverse sans vérification CSRF pour laisser `requireRole()` répondre
+  `401` (pas de `403` CSRF trompeur).
 
 ## Configuration
 
 Voir `backend/.env.example` pour la liste complète des variables et
 `npm run auth:config:check` pour valider la configuration locale sans
-afficher de valeur sensible.
+afficher de valeur sensible (aussi exécuté en `ExecStartPre` du service
+systemd — voir `docs/deployment.md`).
 
-En l'absence de `backend/.env` valide (hors `NODE_ENV=test`), seules les
-routes `/api/auth/*` échouent (`500 auth_not_configured`) ; le reste de
-l'application démarre normalement.
+En l'absence de configuration valide (hors `NODE_ENV=test`) :
 
-Sur le VPS, `assertPilotEnvironmentAllowed()` refuse `NODE_ENV=production`
-tant que le store SQLite du jalon 2 n'existe pas. Pour tester ce pilote sur
-le VPS existant (données fictives, pas encore de vrais utilisateurs), voir
-`docs/specs/2026-07-31-deploy-node-env-configurable.md` : `NODE_ENV` peut
-être basculé de façon persistante sur `staging` via `deploy.sh staging`.
+* En développement, seules les routes `/api/auth/*` échouent
+  (`500 auth_not_configured`) ; le reste de l'application démarre
+  normalement (`loadAuthConfigOrNull()`).
+* En `production`/`staging`, le démarrage du serveur échoue immédiatement
+  (`loadAuthConfig()`, voir `isProductionLikeEnvironment()` dans
+  `auth.config.ts`) : pas de démarrage silencieux avec une configuration
+  Entra absente ou invalide.
 
 ## Tests back
 
 Fichiers de tests :
 
-* `backend/tests/auth-config.test.ts`
-* `backend/tests/auth-pilot.test.ts`
-
-Scénarios importants :
-
-* Configuration complète acceptée, variable manquante ou invalide rejetée
-  (sans fuite de valeur).
-* Flux complet login → callback → `/me` pour le compte gestionnaire exact.
-* Rejet : `state` invalide, callback sans connexion préalable, erreur Entra
-  explicite, jeton d'un autre tenant.
-* Authentification réussie mais sans rôle pour un compte non gestionnaire du
-  même tenant.
-* Déconnexion : la session ne redonne plus accès à `/me`.
-* Non-régression : une route métier existante (`GET /api/companies`) n'est
-  pas affectée par la session pilote.
-* Purge du cache MSAL après le callback, succès comme rejet de tenant.
+* `backend/tests/auth-config.test.ts` — validation de configuration.
+* `backend/tests/auth-pilot.test.ts` — flux login → callback → `/me` →
+  logout, erreurs OAuth (`state`, tenant, `pendingAuth`), purge du cache
+  MSAL.
+* `backend/tests/auth-roles.test.ts` — classification du rôle de base,
+  liaison étudiante (casse, repli sur `mail`, domaines trompeurs),
+  recalcul à chaque connexion.
+* `backend/tests/auth-impersonation.test.ts` — activation/sortie des deux
+  modes, exclusivité, entité inexistante, refus lecteur/étudiant réel, CSRF,
+  effacement à la reconnexion.
+* `backend/tests/session-store.test.ts` — store SQLite (get/set/destroy,
+  expiration, persistance entre instances).
+* `backend/tests/helpers/authenticated-agent.ts` — établit une vraie session
+  Supertest (login + callback avec un faux fournisseur Entra) pour les
+  tests des autres features ; `loginAsEntreprise()` passe par une
+  incarnation gestionnaire puisqu'aucun compte entreprise réel n'existe.
 
 Un faux fournisseur (`EntraAuthProvider`) est injecté via
-`setEntraProvider()` dans les tests : aucun appel réseau réel vers Microsoft
-n'a lieu dans la suite automatisée.
+`setEntraProvider()` : aucun appel réseau réel vers Microsoft n'a lieu dans
+la suite automatisée.
 
 ## Documents liés
 
 * Spec : `docs/specs/2026-07-31-authentification-microsoft-entra-v1.md`
 * Plan : `docs/plans/2026-07-31-authentification-microsoft-entra-v1.md`
-* Review pilote : `docs/reviews/2026-07-31-authentification-microsoft-entra-pilot.md`
+* Review pilote (jalon 1) : `docs/reviews/2026-07-31-authentification-microsoft-entra-pilot.md`
+* Review cible (jalons 2-7) : `docs/reviews/2026-07-31-authentification-microsoft-entra-v1.md`
 * Carte des features : `docs/features.md`
 * Modèle de données : `docs/data-model.md`
+* Déploiement / secrets : `docs/deployment.md`
+* Points d'attention avant mise en production réelle : `docs/production-readiness.md`
