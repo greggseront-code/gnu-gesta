@@ -2,7 +2,7 @@
 # Deploiement sur le VPS. A executer sur le VPS lui-meme (en SSH), ou via
 # deploy-prod.sh depuis le poste local. Jamais declenche automatiquement.
 #
-# Usage: ./deploy.sh [--env production|staging] [--skip-git] [-h|--help]
+# Usage: ./deploy.sh [--env production|staging] [--skip-git] [--shutdown] [-h|--help]
 # Voir print_usage() ci-dessous pour le detail de chaque option.
 set -euo pipefail
 
@@ -14,7 +14,7 @@ ALLOWED_ENVS=(production staging)
 
 print_usage() {
   cat <<'USAGE'
-Usage: ./deploy.sh [--env production|staging] [--skip-git] [-h|--help]
+Usage: ./deploy.sh [--env production|staging] [--skip-git] [--shutdown] [-h|--help]
 
   --env production|staging   Bascule et persiste l'environnement runtime
                               (NODE_ENV) du service backend dans
@@ -29,6 +29,9 @@ Usage: ./deploy.sh [--env production|staging] [--skip-git] [-h|--help]
                               avant commit/push : le repo peut alors
                               contenir des modifications non commitees.
 
+  --shutdown                 Arrete le service backend de l'application,
+                              sans effectuer de deploiement.
+
   -h, --help                  Affiche cette aide et quitte.
 
 Sans argument : redeploie le code deja pousse sur origin/main (pull
@@ -38,6 +41,7 @@ USAGE
 
 target_env=""
 skip_git=0
+shutdown=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -51,6 +55,10 @@ while [ $# -gt 0 ]; do
       ;;
     --skip-git)
       skip_git=1
+      shift
+      ;;
+    --shutdown)
+      shutdown=1
       shift
       ;;
     -h|--help)
@@ -78,6 +86,13 @@ fi
 
 exec 200>"$LOCK_FILE"
 flock -n 200 || { echo "Un deploiement est deja en cours, on arrete."; exit 1; }
+
+if [ "$shutdown" -eq 1 ]; then
+  echo "==> arret du service backend"
+  sudo systemctl stop gnu-gesta-backend
+  echo "Application arretee."
+  exit 0
+fi
 
 cd "$REPO_DIR"
 
