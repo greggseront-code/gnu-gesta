@@ -125,6 +125,18 @@ export function OfferDetailsPage() {
         </div>
         <div className="card-body">
           <div className="meta-list">
+            <div className="meta-item">
+              <span className="meta-label">Entreprise</span>
+              <span className="meta-value">
+                <Link to={`/admin/companies/${offer.company_id}`}>{offer.company_name}</Link>
+              </span>
+            </div>
+            {role === 'gestionnaire' && offer.source_type === 'student' && offer.submitted_by_student_name && (
+              <div className="meta-item">
+                <span className="meta-label">Soumise par</span>
+                <span className="meta-value">{offer.submitted_by_student_name}</span>
+              </div>
+            )}
             {offer.location && (
               <div className="meta-item">
                 <span className="meta-label">Lieu</span>

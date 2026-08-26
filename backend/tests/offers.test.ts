@@ -75,6 +75,43 @@ describe('offers backend', () => {
     expect(res.body.status).toBe('soumise');
   });
 
+  it("POST /api/offers refuse une deuxième soumission tant que la première d'un étudiant est soumise", async () => {
+    const student = await loginAsEtudiant(studentEmail);
+    const first = await student.agent.post('/api/offers').set('x-csrf-token', student.csrfToken).send(offer());
+    expect(first.status).toBe(201);
+
+    const second = await student.agent.post('/api/offers').set('x-csrf-token', student.csrfToken).send(offer());
+    expect(second.status).toBe(409);
+    expect(second.body.existing_offer_id).toBe(first.body.id);
+  });
+
+  it("POST /api/offers autorise une nouvelle soumission après validation de la précédente", async () => {
+    const student = await loginAsEtudiant(studentEmail);
+    const first = await student.agent.post('/api/offers').set('x-csrf-token', student.csrfToken).send(offer());
+    await manager.agent.post(`/api/offers/${first.body.id}/validate`).set('x-csrf-token', manager.csrfToken);
+
+    const second = await student.agent.post('/api/offers').set('x-csrf-token', student.csrfToken).send(offer());
+    expect(second.status).toBe(201);
+  });
+
+  it("POST /api/offers autorise une nouvelle soumission après refus de la précédente", async () => {
+    const student = await loginAsEtudiant(studentEmail);
+    const first = await student.agent.post('/api/offers').set('x-csrf-token', student.csrfToken).send(offer());
+    await manager.agent.post(`/api/offers/${first.body.id}/reject`).set('x-csrf-token', manager.csrfToken);
+
+    const second = await student.agent.post('/api/offers').set('x-csrf-token', student.csrfToken).send(offer());
+    expect(second.status).toBe(201);
+  });
+
+  it("POST /api/offers n'applique pas la limite d'une offre en attente aux entreprises", async () => {
+    const entreprise = await loginAsEntreprise(companyId);
+    const first = await entreprise.agent.post('/api/offers').set('x-csrf-token', entreprise.csrfToken).send(offer());
+    expect(first.status).toBe(201);
+
+    const second = await entreprise.agent.post('/api/offers').set('x-csrf-token', entreprise.csrfToken).send(offer());
+    expect(second.status).toBe(201);
+  });
+
   it('POST /api/offers sans priority_contact_id retourne 400', async () => {
     const { priority_contact_id: _, ...body } = offer();
     const res = await postAsManager(body);
@@ -93,6 +130,26 @@ describe('offers backend', () => {
     const res = await manager.agent.get('/api/offers');
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
+  });
+
+  it('les réponses d\'offre incluent company_name et submitted_by_student_name', async () => {
+    const created = await postAsManager(offer());
+    expect(created.body.company_name).toBe('Acme');
+    expect(created.body.submitted_by_student_name).toBeNull();
+
+    const student = await loginAsEtudiant(studentEmail);
+    const studentOffer = await student.agent.post('/api/offers').set('x-csrf-token', student.csrfToken).send(offer());
+    expect(studentOffer.body.company_name).toBe('Acme');
+    expect(studentOffer.body.submitted_by_student_name).toBe('Alice Martin');
+
+    const list = await manager.agent.get('/api/offers');
+    const fromList = list.body.find((o: { id: number }) => o.id === studentOffer.body.id);
+    expect(fromList.company_name).toBe('Acme');
+    expect(fromList.submitted_by_student_name).toBe('Alice Martin');
+
+    const detail = await manager.agent.get(`/api/offers/${studentOffer.body.id}`);
+    expect(detail.body.company_name).toBe('Acme');
+    expect(detail.body.submitted_by_student_name).toBe('Alice Martin');
   });
 
   it('GET /api/offers etudiant voit uniquement validee_et_visible + ses propositions', async () => {

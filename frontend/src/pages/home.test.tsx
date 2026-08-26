@@ -30,6 +30,8 @@ function offer(overrides: Partial<Offer> = {}): Offer {
     source_type: 'company',
     created_at: '2026-01-01',
     updated_at: '2026-01-01',
+    company_name: 'Acme',
+    submitted_by_student_name: null,
     ...overrides,
   };
 }

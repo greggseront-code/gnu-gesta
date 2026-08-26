@@ -21,6 +21,12 @@ export interface Offer {
   updated_at: string;
 }
 
+/** Forme renvoyee par toutes les routes de lecture/mutation HTTP (voir offers.service). */
+export interface OfferWithNames extends Offer {
+  company_name: string;
+  submitted_by_student_name: string | null;
+}
+
 export interface OfferInput {
   company_id: number;
   priority_contact_id: number;

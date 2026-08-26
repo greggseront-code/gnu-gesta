@@ -3,13 +3,15 @@ import { getDb } from '../../db/db.connection';
 import type { Role } from '../../middlewares/auth-context.middleware';
 import { BadRequestError, ConflictError, NotFoundError } from '../../lib/http-errors';
 import { findCompanyById, findCompanyByIdAny, findContactsByIds } from '../companies/companies.queries';
-import type { Offer, OfferInput, OfferStatus } from './offers.types';
+import type { OfferInput, OfferStatus, OfferWithNames } from './offers.types';
 import {
   insertOffer,
   linkOfferContacts,
   findLinkedContactIds,
+  findPendingSubmittedOfferByStudent,
   listOffers as listOffersQuery,
   findOfferById as findOfferByIdQuery,
+  findOfferWithNamesById,
   updateOfferStatus,
   updateOffer as updateOfferQuery,
   updateOfferAttachment,
@@ -46,7 +48,7 @@ function getDependencyBlockers(
   };
 }
 
-export function createOffer(input: OfferInput, auth: AuthContext): Offer {
+export function createOffer(input: OfferInput, auth: AuthContext): OfferWithNames {
   const db = getDb();
 
   // L'entreprise doit etre visible pour l'auteur (validee, ou sa propre
@@ -65,6 +67,18 @@ export function createOffer(input: OfferInput, auth: AuthContext): Offer {
     );
   }
 
+  // Un etudiant ne peut avoir qu'une seule offre de sa propre soumission en
+  // attente a la fois (voir docs/specs/2026-08-02-ajustements-ux-offres-entreprises.md).
+  if (auth.role === 'etudiant' && auth.entityId != null) {
+    const pending = findPendingSubmittedOfferByStudent(db, auth.entityId);
+    if (pending) {
+      throw new ConflictError(
+        'Vous avez déjà une offre en attente de validation. Attendez sa validation avant de soumettre une nouvelle proposition.',
+        { existing_offer_id: pending.id },
+      );
+    }
+  }
+
   let status: OfferStatus = 'soumise';
   if (auth.role === 'gestionnaire') {
     const blockers = getDependencyBlockers(db, input.company_id, input.priority_contact_id, input.contact_ids);
@@ -77,8 +91,8 @@ export function createOffer(input: OfferInput, auth: AuthContext): Offer {
     status = 'validee_et_visible';
   }
 
-  return db.transaction(() => {
-    const created = insertOffer(db, {
+  const created = db.transaction(() => {
+    const inserted = insertOffer(db, {
       ...input,
       // These attribution fields drive visibility: student proposals remain
       // visible to their author, and company-created offers stay visible to the
@@ -89,17 +103,18 @@ export function createOffer(input: OfferInput, auth: AuthContext): Offer {
       source_type: auth.role === 'etudiant' ? 'student' : 'company',
       status,
     });
-    linkOfferContacts(db, created.id, input.contact_ids);
-    return created;
+    linkOfferContacts(db, inserted.id, input.contact_ids);
+    return inserted;
   })();
+  return findOfferWithNamesById(db, created.id)!;
 }
 
-export function getOffers(auth: AuthContext, search?: string): Offer[] {
+export function getOffers(auth: AuthContext, search?: string): OfferWithNames[] {
   return listOffersQuery(getDb(), auth, search);
 }
 
-export function getOfferById(id: number): Offer | null {
-  return findOfferByIdQuery(getDb(), id);
+export function getOfferById(id: number): OfferWithNames | null {
+  return findOfferWithNamesById(getDb(), id);
 }
 
 export function getOfferDependencyStatus(id: number): OfferDependencyStatus | null {
@@ -109,7 +124,7 @@ export function getOfferDependencyStatus(id: number): OfferDependencyStatus | nu
   return getDependencyBlockers(db, offer.company_id, offer.priority_contact_id, findLinkedContactIds(db, id));
 }
 
-export function validateOffer(id: number): Offer {
+export function validateOffer(id: number): OfferWithNames {
   const db = getDb();
   const offer = findOfferByIdQuery(db, id);
   if (!offer) {
@@ -122,19 +137,26 @@ export function validateOffer(id: number): Offer {
       blockers,
     );
   }
-  return updateOfferStatus(db, id, 'validee_et_visible');
+  updateOfferStatus(db, id, 'validee_et_visible');
+  return findOfferWithNamesById(db, id)!;
 }
 
-export function rejectOffer(id: number): Offer {
-  return updateOfferStatus(getDb(), id, 'refusee');
+export function rejectOffer(id: number): OfferWithNames {
+  const db = getDb();
+  updateOfferStatus(db, id, 'refusee');
+  return findOfferWithNamesById(db, id)!;
 }
 
-export function closeOffer(id: number): Offer {
-  return updateOfferStatus(getDb(), id, 'non_disponible');
+export function closeOffer(id: number): OfferWithNames {
+  const db = getDb();
+  updateOfferStatus(db, id, 'non_disponible');
+  return findOfferWithNamesById(db, id)!;
 }
 
-export function editOffer(id: number, fields: Parameters<typeof updateOfferQuery>[2]): Offer {
-  return updateOfferQuery(getDb(), id, fields);
+export function editOffer(id: number, fields: Parameters<typeof updateOfferQuery>[2]): OfferWithNames {
+  const db = getDb();
+  updateOfferQuery(db, id, fields);
+  return findOfferWithNamesById(db, id)!;
 }
 
 export interface OfferAssignmentInput {
@@ -150,7 +172,7 @@ export interface OfferAssignmentInput {
  * ensuite débloquer la validation de l'offre plutôt que de reproduire une
  * dépendance en attente.
  */
-export function reassignOffer(id: number, input: OfferAssignmentInput): Offer {
+export function reassignOffer(id: number, input: OfferAssignmentInput): OfferWithNames {
   const db = getDb();
   const offer = findOfferByIdQuery(db, id);
   if (!offer) {
@@ -179,9 +201,12 @@ export function reassignOffer(id: number, input: OfferAssignmentInput): Offer {
     throw new ConflictError("L'entreprise et tous les contacts sélectionnés doivent être validés avant la réaffectation.");
   }
 
-  return replaceOfferAssignment(db, id, input);
+  replaceOfferAssignment(db, id, input);
+  return findOfferWithNamesById(db, id)!;
 }
 
-export function attachFile(id: number, filePath: string): Offer {
-  return updateOfferAttachment(getDb(), id, filePath);
+export function attachFile(id: number, filePath: string): OfferWithNames {
+  const db = getDb();
+  updateOfferAttachment(db, id, filePath);
+  return findOfferWithNamesById(db, id)!;
 }

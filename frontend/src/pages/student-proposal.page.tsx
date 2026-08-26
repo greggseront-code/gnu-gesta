@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { listCompanies, getCompany, createCompany, addContact } from '../features/companies/companies.api';
 import type { Company, CompanyContact, CompanyWithContacts, ContactRole } from '../features/companies/companies.types';
 import { CONTACT_ROLE_LABELS } from '../features/companies/companies.types';
-import { createOffer, uploadOfferAttachment } from '../features/offers/offers.api';
-import type { OfferInput } from '../features/offers/offers.types';
+import { createOffer, uploadOfferAttachment, listMyStudentOffers } from '../features/offers/offers.api';
+import type { Offer, OfferInput } from '../features/offers/offers.types';
 import { OfferForm } from '../features/offers/offer-form';
 import { useAuth } from '../context/auth-context';
 
@@ -44,9 +44,10 @@ export function StudentProposalPage() {
   const [newCRoles, setNewCRoles] = useState<ContactRole[]>([]);
   const [newCompanyError, setNewCompanyError] = useState<string | null>(null);
 
-  // Step 2: contact search
+  // Step 2: contact search — la liste complète des contacts est affichée par
+  // défaut (aucune recherche préalable requise, voir
+  // docs/specs/2026-08-02-ajustements-ux-offres-entreprises.md).
   const [contactSearchTerm, setContactSearchTerm] = useState('');
-  const [contactSearchDone, setContactSearchDone] = useState(false);
   const [contactSearchResults, setContactSearchResults] = useState<CompanyContact[]>([]);
   const [selectedContactId, setSelectedContactId] = useState<number | null>(null);
 
@@ -61,8 +62,48 @@ export function StudentProposalPage() {
 
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Un etudiant ne peut avoir qu'une offre 'soumise' en attente a la fois
+  // (voir docs/specs/2026-08-02-ajustements-ux-offres-entreprises.md) : ce
+  // blocage doit apparaitre des le clic sur "Proposer un stage", pas
+  // seulement a la toute fin du formulaire en trois etapes.
+  const [pendingOffer, setPendingOffer] = useState<Offer | null | 'checking'>('checking');
+
+  useEffect(() => {
+    if (role !== 'etudiant') return;
+    listMyStudentOffers()
+      .then((offers) => {
+        const pending = offers.find((o) => o.source_type === 'student' && o.status === 'soumise');
+        setPendingOffer(pending ?? null);
+      })
+      .catch(() => setPendingOffer(null));
+  }, [role]);
+
+  // Guard placé après tous les hooks pour respecter les règles des hooks.
   if (role !== 'etudiant') {
     return <Navigate to="/offers" replace />;
+  }
+
+  if (pendingOffer === 'checking') {
+    return <p className="text-muted">Chargement…</p>;
+  }
+
+  if (pendingOffer) {
+    return (
+      <div>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Proposer un stage</h1>
+            <p className="page-subtitle"><Link to="/offers">Offres</Link> / Proposer</p>
+          </div>
+        </div>
+        <div className="alert alert-error">
+          Vous avez déjà une offre en attente de validation. Attendez sa validation avant de soumettre une nouvelle proposition.
+        </div>
+        <div style={{ marginTop: '1rem' }}>
+          <Link to={`/offers/${pendingOffer.id}`} className="btn btn-secondary">Voir mon offre en attente</Link>
+        </div>
+      </div>
+    );
   }
 
   function handleSearchTermChange(value: string) {
@@ -82,10 +123,9 @@ export function StudentProposalPage() {
     }
   }
 
-  function resetContactStep() {
+  function resetContactStep(contacts: CompanyContact[]) {
     setContactSearchTerm('');
-    setContactSearchDone(false);
-    setContactSearchResults([]);
+    setContactSearchResults(contacts);
     setSelectedContactId(null);
     setShowNewContactForm(false);
     setNcFirstName(''); setNcLastName(''); setNcEmail(''); setNcPhone(''); setNcRoles([]);
@@ -96,7 +136,7 @@ export function StudentProposalPage() {
     try {
       const full = await getCompany(company.id);
       setSelectedCompany(full);
-      resetContactStep();
+      resetContactStep(full.contacts);
       setStep('contact');
     } catch (err) {
       setFormError(errorMessage(err));
@@ -137,7 +177,6 @@ export function StudentProposalPage() {
 
   function handleContactSearchTermChange(value: string) {
     setContactSearchTerm(value);
-    setContactSearchDone(false);
   }
 
   function handleContactSearch(e: React.FormEvent) {
@@ -150,7 +189,6 @@ export function StudentProposalPage() {
         )
       : all;
     setContactSearchResults(results);
-    setContactSearchDone(true);
   }
 
   function handleSelectContact(contact: CompanyContact) {
@@ -387,12 +425,6 @@ export function StudentProposalPage() {
               {selectedCompany?.validation_status === 'pending' && <PendingBadge />}
             </p>
 
-            {!contactSearchDone && (
-              <div className="alert alert-info" style={{ marginBottom: '1rem' }}>
-                Vérifiez d'abord si le contact existe déjà parmi ceux enregistrés pour cette entreprise, afin d'éviter un doublon.
-              </div>
-            )}
-
             <form onSubmit={handleContactSearch} className="form">
               <div className="form-group">
                 <label className="form-label">Nom ou email du contact</label>
@@ -408,49 +440,50 @@ export function StudentProposalPage() {
               </div>
             </form>
 
-            {contactSearchDone && (
-              <div style={{ marginTop: '1rem' }}>
-                {contactSearchResults.length === 0 ? (
-                  <p className="text-muted">Aucun contact trouvé.</p>
-                ) : (
-                  <div className="table-wrapper">
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>Nom</th>
-                          <th>Email</th>
-                          <th></th>
+            <div style={{ marginTop: '1rem' }}>
+              {contactSearchResults.length === 0 ? (
+                <p className="text-muted">Aucun contact trouvé.</p>
+              ) : (
+                <div className="table-wrapper">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Nom</th>
+                        <th>Email</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {contactSearchResults.map((c) => (
+                        <tr key={c.id}>
+                          <td>
+                            {c.first_name} {c.last_name}
+                            {c.validation_status === 'pending' && <PendingBadge />}
+                          </td>
+                          <td className="text-muted">{c.email}</td>
+                          <td>
+                            <button className="btn btn-primary btn-sm" onClick={() => handleSelectContact(c)}>
+                              Sélectionner
+                            </button>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {contactSearchResults.map((c) => (
-                          <tr key={c.id}>
-                            <td>
-                              {c.first_name} {c.last_name}
-                              {c.validation_status === 'pending' && <PendingBadge />}
-                            </td>
-                            <td className="text-muted">{c.email}</td>
-                            <td>
-                              <button className="btn btn-primary btn-sm" onClick={() => handleSelectContact(c)}>
-                                Sélectionner
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
-                {!showNewContactForm && (
-                  <div style={{ marginTop: '1rem' }}>
-                    <button className="btn btn-secondary" onClick={() => setShowNewContactForm(true)}>
-                      Proposer un nouveau contact
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+              {!showNewContactForm && (
+                <div style={{ marginTop: '1rem' }}>
+                  <p className="text-muted" style={{ fontSize: '0.8125rem', marginBottom: '0.5rem' }}>
+                    Vérifiez que le contact ne figure pas déjà dans la liste ci-dessus avant d'en proposer un nouveau.
+                  </p>
+                  <button className="btn btn-secondary" onClick={() => setShowNewContactForm(true)}>
+                    Proposer un nouveau contact
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="form-actions" style={{ marginTop: '1rem' }}>
               <button className="btn btn-secondary" onClick={() => setStep('search')}>

@@ -5,6 +5,7 @@ import { StudentProposalPage } from './student-proposal.page';
 import { AuthProvider } from '../context/auth-context';
 import * as companiesApi from '../features/companies/companies.api';
 import * as authApi from '../features/auth/auth.api';
+import * as offersApi from '../features/offers/offers.api';
 import type { Company, CompanyWithContacts } from '../features/companies/companies.types';
 
 vi.mock('../features/companies/companies.api');
@@ -59,6 +60,7 @@ beforeEach(() => {
     impersonation: null,
     csrfToken: 'csrf-token',
   });
+  vi.mocked(offersApi.listMyStudentOffers).mockResolvedValue([]);
 });
 
 function renderPage() {
@@ -89,6 +91,39 @@ test("le formulaire de création d'entreprise reste indisponible avant la recher
   expect(screen.queryByText('Suggérer une nouvelle entreprise')).not.toBeInTheDocument();
 });
 
+test("le blocage d'une offre déjà en attente apparaît dès l'ouverture de la page, avant toute recherche", async () => {
+  vi.mocked(offersApi.listMyStudentOffers).mockResolvedValue([
+    {
+      id: 7,
+      company_id: 1,
+      priority_contact_id: 10,
+      description: 'Stage déjà proposé',
+      location: null,
+      technologies: null,
+      objectives: null,
+      remote_allowed: 0,
+      remote_percentage: null,
+      remarks: null,
+      attachment_path: null,
+      status: 'soumise',
+      submitted_by_student_id: 42,
+      created_by_company_id: null,
+      source_type: 'student',
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+      company_name: 'Acme Corp',
+      submitted_by_student_name: 'Alice Étudiante',
+    },
+  ]);
+
+  renderPage();
+
+  expect(await screen.findByText(/vous avez déjà une offre en attente de validation/i)).toBeInTheDocument();
+  expect(screen.queryByText("Étape 1 — Rechercher l'entreprise")).not.toBeInTheDocument();
+  const link = screen.getByRole('link', { name: 'Voir mon offre en attente' });
+  expect(link).toHaveAttribute('href', '/offers/7');
+});
+
 test('la recherche débloque le résultat et le bouton de création', async () => {
   vi.mocked(companiesApi.listCompanies).mockResolvedValue([company()]);
 
@@ -112,7 +147,7 @@ test('modifier le terme de recherche redemande une recherche avant de pouvoir cr
   expect(await screen.findByText(/vérifiez d'abord que cette entreprise n'existe pas déjà/i)).toBeInTheDocument();
 });
 
-test("sélectionner une entreprise mène à l'étape de recherche de contact", async () => {
+test("sélectionner une entreprise affiche directement tous ses contacts, sans recherche préalable", async () => {
   vi.mocked(companiesApi.listCompanies).mockResolvedValue([company()]);
   vi.mocked(companiesApi.getCompany).mockResolvedValue(companyWithContacts());
 
@@ -121,23 +156,24 @@ test("sélectionner une entreprise mène à l'étape de recherche de contact", a
   await userEvent.click(await screen.findByText('Sélectionner'));
 
   expect(await screen.findByText('Étape 2 — Rechercher le contact')).toBeInTheDocument();
-  expect(screen.getByText(/vérifiez d'abord si le contact existe déjà/i)).toBeInTheDocument();
-  expect(screen.queryByText('Proposer un nouveau contact')).not.toBeInTheDocument();
+  expect(screen.getByText('Jean Dupont')).toBeInTheDocument();
+  expect(screen.getByText('Proposer un nouveau contact')).toBeInTheDocument();
 });
 
-test("la recherche de contact affiche les résultats et débloque la création d'un nouveau contact", async () => {
+test('la recherche de contact filtre la liste déjà affichée', async () => {
   vi.mocked(companiesApi.listCompanies).mockResolvedValue([company()]);
   vi.mocked(companiesApi.getCompany).mockResolvedValue(companyWithContacts());
 
   renderPage();
   await userEvent.click(await screen.findByRole('button', { name: 'Rechercher' }));
   await userEvent.click(await screen.findByText('Sélectionner'));
-  await screen.findByText('Étape 2 — Rechercher le contact');
+  await screen.findByText('Jean Dupont');
 
+  await userEvent.type(screen.getByPlaceholderText('Rechercher un contact…'), 'zzz');
   await userEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
 
-  expect(await screen.findByText('Jean Dupont')).toBeInTheDocument();
-  expect(screen.getByText('Proposer un nouveau contact')).toBeInTheDocument();
+  expect(screen.queryByText('Jean Dupont')).not.toBeInTheDocument();
+  expect(await screen.findByText('Aucun contact trouvé.')).toBeInTheDocument();
 });
 
 test("sélectionner un contact existant mène à l'étape du formulaire d'offre", async () => {
@@ -148,7 +184,6 @@ test("sélectionner un contact existant mène à l'étape du formulaire d'offre"
   await userEvent.click(await screen.findByRole('button', { name: 'Rechercher' }));
   await userEvent.click(await screen.findByText('Sélectionner'));
   await screen.findByText('Étape 2 — Rechercher le contact');
-  await userEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
   await userEvent.click(await screen.findByText('Sélectionner'));
 
   expect(await screen.findByText('Étape 3 — Détails de la proposition')).toBeInTheDocument();
@@ -176,8 +211,6 @@ test('créer un nouveau contact le sélectionne immédiatement et avance à l\'�
   const { container } = renderPage();
   await userEvent.click(await screen.findByRole('button', { name: 'Rechercher' }));
   await userEvent.click(await screen.findByText('Sélectionner'));
-  await screen.findByText('Étape 2 — Rechercher le contact');
-  await userEvent.click(screen.getByRole('button', { name: 'Rechercher' }));
   await screen.findByText('Aucun contact trouvé.');
   await userEvent.click(screen.getByText('Proposer un nouveau contact'));
 

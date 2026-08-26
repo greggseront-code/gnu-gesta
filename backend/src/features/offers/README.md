@@ -46,6 +46,12 @@ Statuts connus :
 Le statut `refusee` existe dans le code et le schéma SQL, mais reste à confirmer
 comme statut produit officiel.
 
+Toute réponse HTTP d'offre (liste, détail, création, validation, refus,
+indisponibilité, modification, réaffectation, pièce jointe) est enrichie de
+deux champs calculés par jointure, absents du schéma SQL : `company_name` et
+`submitted_by_student_name` (`null` si l'offre n'a pas été soumise par un
+étudiant). Voir `OfferWithNames` dans `offers.types.ts`.
+
 ## Règles métier
 
 * Les offres sont filtrées selon le rôle courant.
@@ -68,6 +74,11 @@ comme statut produit officiel.
 * Un étudiant ne peut utiliser que ses propres entreprises et contacts en
   attente, jamais ceux d'un autre étudiant (l'entreprise cible non visible
   retourne `404`).
+* Un étudiant ne peut avoir qu'une seule offre `soumise` de sa propre
+  soumission à la fois : une nouvelle proposition est refusée (`409` avec
+  `existing_offer_id`) tant que la précédente n'est pas validée, refusée ou
+  rendue indisponible. Cette limite ne s'applique ni aux entreprises ni au
+  gestionnaire, et ne restreint pas les candidatures (`applications`).
 * Une offre ne peut passer à `validee_et_visible` (création gestionnaire ou
   `POST /:id/validate`) que si son entreprise, son contact prioritaire et
   tous ses contacts associés sont `validated` ; sinon `409` avec
@@ -105,6 +116,11 @@ Points d'attention :
   contacts orphelins de l'ancienne entreprise, a été retirée après migration
   de son seul appelant frontend (`admin-offers.page.tsx`) vers
   `PATCH /:id/assignment`.
+* Côté frontend, `PATCH /:id/assignment` n'est plus appelé depuis la liste
+  `/admin/offers` : la réaffectation vit désormais dans l'écran d'édition de
+  l'offre (`/offers/:id/edit`, `submit-offer.page.tsx`), réservée au
+  gestionnaire en mode édition, aux côtés de l'édition des champs texte
+  existante.
 * La pièce jointe est stockée comme chemin dans `offers.attachment_path`.
 
 Voir aussi : `docs/data-model.md`.
@@ -148,10 +164,17 @@ Scénarios importants :
 * Modification, upload de pièce jointe et rejet des fichiers non autorisés.
 * Cycle complet : proposition étudiante avec entreprise en attente, contrôle
   gestionnaire, validation de l'offre, visibilité pour un autre étudiant.
+* Limite d'une offre `soumise` en attente par étudiant : refus de la deuxième
+  soumission, déblocage après validation ou refus de la première, absence
+  d'effet sur les entreprises.
+* Présence de `company_name` et `submitted_by_student_name` sur les réponses
+  de liste et de détail.
 
 ## Documents liés
 
 * Carte des features : `docs/features.md`
 * Modèle de données : `docs/data-model.md`
 * Spec : `docs/specs/2026-08-02-validation-offres-entreprises-contacts.md`
+* Spec : `docs/specs/2026-08-02-ajustements-ux-offres-entreprises.md`
 * Review : `docs/reviews/2026-08-02-validation-offres-entreprises-contacts.md`
+* Review : `docs/reviews/2026-08-02-ajustements-ux-offres-entreprises.md`

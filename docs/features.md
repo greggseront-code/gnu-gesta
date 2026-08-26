@@ -239,16 +239,27 @@ des propositions étudiantes.
 
 * Une entreprise dépose une offre.
 * Un étudiant peut proposer un stage : recherche obligatoire d'une entreprise
-  (puis, le cas échéant, de ses contacts) avant de pouvoir en proposer une
-  nouvelle, avec message anti-doublon avant chaque recherche.
+  avant de pouvoir en proposer une nouvelle, avec message anti-doublon avant
+  la recherche ; la liste complète des contacts de l'entreprise sélectionnée
+  s'affiche par défaut (sans obligation de recherche préalable pour en
+  proposer un nouveau).
+* Un étudiant ne peut avoir qu'une seule offre de sa propre soumission
+  `soumise` (en attente) à la fois ; une nouvelle proposition est refusée tant
+  que la précédente n'est pas traitée. Cette limite ne s'applique pas à ses
+  candidatures (`applications`), ni aux offres déposées par une entreprise ou
+  un gestionnaire.
 * Un gestionnaire valide, refuse ou rend une offre indisponible ;
   `/admin/offers` signale les dépendances (entreprise/contacts) encore en
   attente et désactive la validation tant qu'elles ne sont pas levées, avec
-  un lien vers `/admin/companies`.
+  un lien vers `/admin/companies`. Le nom de l'entreprise (lien vers son
+  détail) et, pour une offre étudiante, le nom de l'étudiant créateur y sont
+  affichés.
 * Le gestionnaire peut réaffecter atomiquement l'entreprise, le contact
   prioritaire et les contacts associés d'une offre vers des éléments déjà
-  validés.
-* Les étudiants consultent les offres visibles et peuvent postuler.
+  validés, depuis l'écran d'édition de l'offre (`/offers/:id/edit`) plutôt que
+  depuis la liste `/admin/offers`.
+* Les étudiants consultent les offres visibles et peuvent postuler ; une
+  offre qu'ils ont eux-mêmes soumise porte le libellé "Soumise par moi".
 * Une entreprise suit ses offres et les candidatures associées.
 
 ### Règles principales
@@ -267,6 +278,11 @@ des propositions étudiantes.
 * Les offres `prise` ou `non_disponible` ne sont plus ouvertes comme offres
   disponibles.
 * Les gestionnaires pilotent les changements de statut pédagogiques.
+* Un étudiant ne peut avoir qu'une offre `soumise` dont il est le créateur à
+  la fois (`409` sinon), sans effet sur les entreprises, le gestionnaire ou
+  ses candidatures.
+* Toute réponse d'offre inclut `company_name` et, si la source est un
+  étudiant, `submitted_by_student_name`.
 
 ### Contrat front/back
 

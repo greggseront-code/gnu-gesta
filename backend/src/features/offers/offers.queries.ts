@@ -1,6 +1,22 @@
 import type { Database } from 'better-sqlite3';
-import type { Offer, OfferInput, OfferStatus, OfferSourceType } from './offers.types';
+import type { Offer, OfferInput, OfferStatus, OfferSourceType, OfferWithNames } from './offers.types';
 import type { Role } from '../../middlewares/auth-context.middleware';
+
+/**
+ * Jointure commune pour enrichir une offre du nom de son entreprise et,
+ * quand elle existe, du nom de l'etudiant qui l'a soumise. `o.*` en premier
+ * garantit que les colonnes de offers priment en cas d'homonymie (ex. `id`).
+ */
+const OFFER_SELECT_WITH_NAMES = `
+  SELECT o.*,
+         c.name AS company_name,
+         CASE WHEN o.submitted_by_student_id IS NOT NULL
+              THEN st.first_name || ' ' || st.last_name
+              ELSE NULL END AS submitted_by_student_name
+  FROM offers o
+  JOIN companies c ON c.id = o.company_id
+  LEFT JOIN students st ON st.id = o.submitted_by_student_id
+`;
 
 interface AuthContext {
   role: Role | null;
@@ -61,66 +77,86 @@ export function linkOfferContacts(db: Database, offerId: number, contactIds: num
   run(contactIds);
 }
 
-export function listOffers(db: Database, auth: AuthContext, search?: string): Offer[] {
+export function listOffers(db: Database, auth: AuthContext, search?: string): OfferWithNames[] {
   const { role, entityId } = auth;
 
   const searchClause = search
-    ? `AND (LOWER(description) LIKE @search OR LOWER(technologies) LIKE @search OR LOWER(location) LIKE @search)`
+    ? `AND (LOWER(o.description) LIKE @search OR LOWER(o.technologies) LIKE @search OR LOWER(o.location) LIKE @search)`
     : '';
   const sp = search ? `%${search.toLowerCase()}%` : undefined;
 
   if (role === 'gestionnaire') {
     return db
-      .prepare(`SELECT * FROM offers WHERE 1=1 ${searchClause} ORDER BY created_at DESC`)
-      .all(sp ? { search: sp } : {}) as Offer[];
+      .prepare(`${OFFER_SELECT_WITH_NAMES} WHERE 1=1 ${searchClause} ORDER BY o.created_at DESC`)
+      .all(sp ? { search: sp } : {}) as OfferWithNames[];
   }
 
   // Le lecteur n'accede pas aux offres 'soumise' (en attente de validation),
   // seulement aux statuts deja traites par le gestionnaire.
   if (role === 'lecteur') {
     return db
-      .prepare(`SELECT * FROM offers WHERE status != 'soumise' ${searchClause} ORDER BY created_at DESC`)
-      .all(sp ? { search: sp } : {}) as Offer[];
+      .prepare(`${OFFER_SELECT_WITH_NAMES} WHERE o.status != 'soumise' ${searchClause} ORDER BY o.created_at DESC`)
+      .all(sp ? { search: sp } : {}) as OfferWithNames[];
   }
 
   if (role === 'etudiant' && entityId != null) {
-    const joinSearchClause = search
-      ? `AND (LOWER(o.description) LIKE @search OR LOWER(o.technologies) LIKE @search OR LOWER(o.location) LIKE @search)`
-      : '';
     // Student visibility is broader than public visibility: they keep access to
     // their own proposals and to offers they applied to, except when an offer is
     // explicitly marked non_disponible.
     return db
       .prepare(
-        `SELECT DISTINCT o.* FROM offers o
+        `SELECT DISTINCT o.*,
+                c.name AS company_name,
+                CASE WHEN o.submitted_by_student_id IS NOT NULL
+                     THEN st.first_name || ' ' || st.last_name
+                     ELSE NULL END AS submitted_by_student_name
+         FROM offers o
+         JOIN companies c ON c.id = o.company_id
+         LEFT JOIN students st ON st.id = o.submitted_by_student_id
          LEFT JOIN applications a ON a.offer_id = o.id AND a.student_id = @entityId
          WHERE (
            o.status = 'validee_et_visible'
            OR o.submitted_by_student_id = @entityId
            OR (a.id IS NOT NULL AND o.status != 'non_disponible')
          )
-         ${joinSearchClause}
+         ${searchClause}
          ORDER BY o.created_at DESC`,
       )
-      .all({ entityId, ...(sp ? { search: sp } : {}) }) as Offer[];
+      .all({ entityId, ...(sp ? { search: sp } : {}) }) as OfferWithNames[];
   }
 
   if (role === 'entreprise' && entityId != null) {
     return db
       .prepare(
-        `SELECT * FROM offers WHERE company_id = @entityId ${searchClause} ORDER BY created_at DESC`,
+        `${OFFER_SELECT_WITH_NAMES} WHERE o.company_id = @entityId ${searchClause} ORDER BY o.created_at DESC`,
       )
-      .all({ entityId, ...(sp ? { search: sp } : {}) }) as Offer[];
+      .all({ entityId, ...(sp ? { search: sp } : {}) }) as OfferWithNames[];
   }
 
   // Public
   return db
-    .prepare(`SELECT * FROM offers WHERE status = 'validee_et_visible' ${searchClause} ORDER BY created_at DESC`)
-    .all(sp ? { search: sp } : {}) as Offer[];
+    .prepare(`${OFFER_SELECT_WITH_NAMES} WHERE o.status = 'validee_et_visible' ${searchClause} ORDER BY o.created_at DESC`)
+    .all(sp ? { search: sp } : {}) as OfferWithNames[];
 }
 
 export function findOfferById(db: Database, id: number): Offer | null {
   return (db.prepare('SELECT * FROM offers WHERE id = ?').get(id) as Offer | undefined) ?? null;
+}
+
+/** Forme enrichie utilisee par toutes les reponses HTTP (voir offers.service). */
+export function findOfferWithNamesById(db: Database, id: number): OfferWithNames | null {
+  return (
+    (db.prepare(`${OFFER_SELECT_WITH_NAMES} WHERE o.id = ?`).get(id) as OfferWithNames | undefined) ?? null
+  );
+}
+
+/** Une offre 'soumise' d'un etudiant bloque toute nouvelle proposition de sa part (voir offers.service.createOffer). */
+export function findPendingSubmittedOfferByStudent(db: Database, studentId: number): Offer | null {
+  return (
+    (db
+      .prepare(`SELECT * FROM offers WHERE submitted_by_student_id = ? AND status = 'soumise'`)
+      .get(studentId) as Offer | undefined) ?? null
+  );
 }
 
 export function updateOfferStatus(db: Database, id: number, status: OfferStatus): Offer {

@@ -27,6 +27,8 @@ export interface Offer {
   source_type: OfferSourceType | null;
   created_at: string;
   updated_at: string;
+  company_name: string;
+  submitted_by_student_name: string | null;
 }
 
 export interface OfferInput {

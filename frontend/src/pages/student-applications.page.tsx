@@ -61,6 +61,7 @@ export function StudentApplicationsPage() {
                     <th>Statut de l'offre</th>
                     <th>Candidature</th>
                     <th>Date</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -69,7 +70,9 @@ export function StudentApplicationsPage() {
                     return (
                       <tr key={app.id}>
                         <td>
-                          <Link to={`/offers/${app.offer_id}`}>Offre #{app.offer_id}</Link>
+                          <Link to={`/offers/${app.offer_id}`}>
+                            {offer?.company_name ?? `Offre #${app.offer_id}`}
+                          </Link>
                         </td>
                         <td>
                           {offer ? <StatusBadge status={offer.status} /> : <span className="text-muted">—</span>}
@@ -83,6 +86,9 @@ export function StudentApplicationsPage() {
                         </td>
                         <td className="text-muted">
                           {new Date(app.created_at).toLocaleDateString('fr-FR')}
+                        </td>
+                        <td>
+                          <Link to={`/offers/${app.offer_id}`} className="btn btn-secondary btn-sm">Voir</Link>
                         </td>
                       </tr>
                     );
