@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import type { Offer, OfferInput, OfferStatus, OfferSourceType } from './offers.types';
+import type { Offer, OfferAttachment, OfferInput, OfferStatus, OfferSourceType } from './offers.types';
 import type { Role } from '../../middlewares/auth-context.middleware';
 
 interface AuthContext {
@@ -123,6 +123,45 @@ export function findOfferById(db: Database, id: number): Offer | null {
   return (db.prepare('SELECT * FROM offers WHERE id = ?').get(id) as Offer | undefined) ?? null;
 }
 
+export function listOfferAttachments(db: Database, offerId: number): OfferAttachment[] {
+  return db
+    .prepare('SELECT * FROM offer_attachments WHERE offer_id = ? ORDER BY created_at ASC, id ASC')
+    .all(offerId) as OfferAttachment[];
+}
+
+export function countOfferAttachments(db: Database, offerId: number): number {
+  return (db.prepare('SELECT COUNT(*) as count FROM offer_attachments WHERE offer_id = ?').get(offerId) as { count: number }).count;
+}
+
+export function insertOfferAttachment(
+  db: Database,
+  fields: { offer_id: number; storage_name: string; mime_type: string; size_bytes: number },
+): OfferAttachment {
+  return db
+    .prepare(
+      `INSERT INTO offer_attachments (offer_id, storage_name, mime_type, size_bytes)
+       VALUES (@offer_id, @storage_name, @mime_type, @size_bytes)
+       RETURNING *`,
+    )
+    .get(fields) as OfferAttachment;
+}
+
+export function findOfferAttachment(db: Database, offerId: number, attachmentId: number): OfferAttachment | null {
+  return (
+    db
+      .prepare('SELECT * FROM offer_attachments WHERE offer_id = ? AND id = ?')
+      .get(offerId, attachmentId) as OfferAttachment | undefined
+  ) ?? null;
+}
+
+export function deleteOfferAttachment(db: Database, offerId: number, attachmentId: number): void {
+  db.prepare('DELETE FROM offer_attachments WHERE offer_id = ? AND id = ?').run(offerId, attachmentId);
+}
+
+export function hasStudentAppliedToOffer(db: Database, offerId: number, studentId: number): boolean {
+  return Boolean(db.prepare('SELECT 1 FROM applications WHERE offer_id = ? AND student_id = ?').get(offerId, studentId));
+}
+
 export function updateOfferStatus(db: Database, id: number, status: OfferStatus): Offer {
   const current = findOfferById(db, id);
   // Status transitions are part of the pedagogical audit trail. Keep the history
@@ -198,10 +237,4 @@ export function replaceOfferAssignment(
 
     return findOfferById(db, id)!;
   })();
-}
-
-export function updateOfferAttachment(db: Database, id: number, attachmentPath: string): Offer {
-  return db
-    .prepare(`UPDATE offers SET attachment_path = ?, updated_at = datetime('now') WHERE id = ? RETURNING *`)
-    .get(attachmentPath, id) as Offer;
 }

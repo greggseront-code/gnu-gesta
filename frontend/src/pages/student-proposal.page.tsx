@@ -3,9 +3,10 @@ import { useNavigate, Link, Navigate } from 'react-router-dom';
 import { listCompanies, getCompany, createCompany, addContact } from '../features/companies/companies.api';
 import type { Company, CompanyContact, CompanyWithContacts, ContactRole } from '../features/companies/companies.types';
 import { CONTACT_ROLE_LABELS } from '../features/companies/companies.types';
-import { createOffer, uploadOfferAttachment } from '../features/offers/offers.api';
+import { createOffer } from '../features/offers/offers.api';
 import type { OfferInput } from '../features/offers/offers.types';
 import { OfferForm } from '../features/offers/offer-form';
+import { OfferUploadStatus, uploadFilesSequentially, type FailedOfferUpload } from '../features/offers/offer-upload-status';
 import { useAuth } from '../context/auth-context';
 
 type Step = 'search' | 'contact' | 'form';
@@ -60,6 +61,7 @@ export function StudentProposalPage() {
   const [newContactError, setNewContactError] = useState<string | null>(null);
 
   const [formError, setFormError] = useState<string | null>(null);
+  const [partialUploads, setPartialUploads] = useState<{ offerId: number; uploadedCount: number; failures: FailedOfferUpload[] } | null>(null);
 
   if (role !== 'etudiant') {
     return <Navigate to="/offers" replace />;
@@ -183,11 +185,11 @@ export function StudentProposalPage() {
     }
   }
 
-  async function handleSubmitProposal(data: OfferInput & { file?: File }) {
+  async function handleSubmitProposal(data: OfferInput & { files: File[] }) {
     if (!selectedCompany) return;
     // priority_contact_id is validated upstream by OfferForm; selectedContactId is non-null here
     if (selectedContactId == null) return;
-    const { file, ...offerData } = data;
+    const { files, ...offerData } = data;
     const payload: OfferInput = {
       ...offerData,
       company_id: selectedCompany.id,
@@ -195,10 +197,28 @@ export function StudentProposalPage() {
       contact_ids: [selectedContactId],
     };
     const saved = await createOffer(payload);
-    if (file) {
-      await uploadOfferAttachment(saved.id, file);
+    if (files.length > 0) {
+      const result = await uploadFilesSequentially(saved.id, files);
+      if (result.failed.length > 0) {
+        setPartialUploads({ offerId: saved.id, uploadedCount: result.succeeded.length, failures: result.failed });
+        return;
+      }
     }
     navigate(`/offers/${saved.id}`);
+  }
+
+  async function retryFailedUploads() {
+    if (!partialUploads) return;
+    const result = await uploadFilesSequentially(partialUploads.offerId, partialUploads.failures.map(({ file }) => file));
+    if (result.failed.length > 0) {
+      setPartialUploads({
+        offerId: partialUploads.offerId,
+        uploadedCount: partialUploads.uploadedCount + result.succeeded.length,
+        failures: result.failed,
+      });
+      return;
+    }
+    navigate(`/offers/${partialUploads.offerId}`);
   }
 
   // ---- Render Step 1: company search ----
@@ -546,12 +566,22 @@ export function StudentProposalPage() {
           <span className="card-title">Étape 3 — Détails de la proposition</span>
         </div>
         <div className="card-body">
-          <OfferForm
-            companyId={selectedCompany?.id ?? 0}
-            contactId={selectedContactId ?? undefined}
-            onSubmit={handleSubmitProposal}
-            submitLabel="Soumettre la proposition"
-          />
+          {partialUploads ? (
+            <OfferUploadStatus
+              offerId={partialUploads.offerId}
+              uploadedCount={partialUploads.uploadedCount}
+              failures={partialUploads.failures}
+              onRetry={retryFailedUploads}
+              onContinue={() => navigate(`/offers/${partialUploads.offerId}`)}
+            />
+          ) : (
+            <OfferForm
+              companyId={selectedCompany?.id ?? 0}
+              contactId={selectedContactId ?? undefined}
+              onSubmit={handleSubmitProposal}
+              submitLabel="Soumettre la proposition"
+            />
+          )}
         </div>
       </div>
     </div>

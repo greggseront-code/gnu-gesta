@@ -25,7 +25,6 @@ function offer(overrides: Partial<Offer> = {}): Offer {
     remote_allowed: 0,
     remote_percentage: null,
     remarks: null,
-    attachment_path: null,
     status: 'soumise',
     submitted_by_student_id: 1,
     created_by_company_id: null,

@@ -40,6 +40,9 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
   validation que `companies`, plus `created_with_company` (contact de la
   soumission initiale d'une entreprise vs ajouté séparément).
 * `offers` : offres de stage et propositions étudiantes.
+* `offer_attachments` : métadonnées des fichiers rattachés aux offres ; le
+  fichier physique est conservé séparément sous `backend/uploads/` avec un nom
+  technique généré par le serveur.
 * `offer_contacts` : table de liaison entre offres et contacts.
 * `applications` : candidatures des étudiants aux offres.
 * `offer_status_history` : historique des changements de statut des offres.
@@ -53,6 +56,8 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
   même sémantique.
 * `offers.company_id` référence `companies.id`.
 * `offers.priority_contact_id` référence `company_contacts.id`.
+* `offer_attachments.offer_id` référence `offers.id` avec suppression en
+  cascade.
 * `offers.submitted_by_student_id` référence `students.id`.
 * `offers.created_by_company_id` référence `companies.id`.
 * `offer_contacts.offer_id` référence `offers.id`.
@@ -75,6 +80,8 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
 
 * `backend/src/features/offers`
   * `offers` : création, lecture, recherche, modification et statuts.
+  * `offer_attachments` : liste, ajout, téléchargement et suppression des
+    métadonnées de documents.
   * `offer_contacts` : rattachement des contacts aux offres.
   * `applications` : utilisée dans les règles de visibilité étudiant.
   * `offer_status_history` : historisation des changements de statut.
@@ -107,6 +114,10 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
   est unique quand les deux sont renseignés
   (`idx_users_entra_identity`).
 * `applications` impose l'unicité du couple `(offer_id, student_id)`.
+* `offer_attachments.storage_name` est non nul et unique ; `mime_type` est
+  limité à `application/pdf` et au MIME DOCX OOXML ; `size_bytes` est compris
+  entre 0 et 5 MiB. L'offre est limitée à dix lignes par le service, dans une
+  transaction.
 * `offers.status` est limité à `soumise`, `validee_et_visible`, `prise`,
   `non_disponible` et `refusee`.
 * `offers.source_type` est limité à `company` ou `student`.
@@ -140,5 +151,7 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
 * La migration future vers PostgreSQL n'est pas définie.
 * Le statut `refusee` existe dans le schéma, mais reste à confirmer comme statut
   produit officiel.
-* Le cycle de vie des pièces jointes n'est pas décrit par le modèle relationnel;
-  les offres stockent seulement un chemin dans `attachment_path`.
+* `offers` ne contient pas de colonne `attachment_path`. La base fictive est
+  recréée depuis le schéma frais ; aucune migration ou backfill de cet ancien
+  champ n'est prévu. Les fichiers locaux ne sont pas inclus dans les backups
+  SQLite.

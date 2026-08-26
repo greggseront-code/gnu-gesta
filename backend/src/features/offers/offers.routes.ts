@@ -1,5 +1,6 @@
 import { Router, type Response } from 'express';
 import { requireRole } from '../../middlewares/authorization.middleware';
+import multer from 'multer';
 import { upload } from '../../middlewares/upload.middleware';
 import { OfferInputSchema, PatchOfferSchema, OfferAssignmentSchema } from './offers.schemas';
 import {
@@ -12,9 +13,13 @@ import {
   closeOffer,
   editOffer,
   reassignOffer,
-  attachFile,
+  canReadOffer,
+  canWriteOffer,
+  getOfferAttachments,
+  addOfferAttachment,
+  getOfferAttachmentDownload,
+  deleteOfferAttachmentById,
 } from './offers.service';
-import { getApplicationByStudentAndOffer } from '../applications/applications.service';
 import { HttpError } from '../../lib/http-errors';
 import type { Offer } from './offers.types';
 
@@ -26,26 +31,6 @@ function handleServiceError(err: unknown, res: Response): void {
     return;
   }
   throw err;
-}
-
-function isVisible(offer: Offer, auth: { role: string | null; entityId: number | null }): boolean {
-  const { role, entityId } = auth;
-  if (role === 'gestionnaire') return true;
-  // Le lecteur n'a pas accès aux offres encore soumises (en attente de validation).
-  if (role === 'lecteur') return offer.status !== 'soumise';
-  if (role === 'etudiant') return offer.status === 'validee_et_visible' || offer.submitted_by_student_id === entityId;
-  if (role === 'entreprise') return offer.company_id === entityId;
-  // Inatteignable derriere requireRole() sur les deux routes GET (jalon 4) :
-  // aucun visiteur anonyme ou role null n'atteint plus ce point.
-  return false;
-}
-
-function canWrite(offer: Offer, auth: { role: string | null; entityId: number | null }): boolean {
-  const { role, entityId } = auth;
-  if (role === 'gestionnaire') return true;
-  if (role === 'entreprise') return offer.company_id === entityId;
-  if (role === 'etudiant') return offer.submitted_by_student_id === entityId;
-  return false;
 }
 
 // GET / — scoped by role, optional ?search=
@@ -69,18 +54,15 @@ offersRouter.post('/', requireRole('gestionnaire', 'etudiant', 'entreprise'), (r
 offersRouter.get('/:id', requireRole('gestionnaire', 'lecteur', 'etudiant', 'entreprise'), (req, res) => {
   const offer = getOfferById(Number(req.params.id));
   if (!offer) { res.status(404).json({ error: 'Offre non trouvée' }); return; }
-  if (!isVisible(offer, req.auth)) {
-    // Keep this exception aligned with listOffers(): an etudiant who already
-    // applied can reopen the offer detail unless it became non_disponible.
-    const { role, entityId } = req.auth;
-    if (role === 'etudiant' && entityId != null && offer.status !== 'non_disponible') {
-      const app = getApplicationByStudentAndOffer(offer.id, entityId);
-      if (!app) { res.status(403).json({ error: 'Accès refusé' }); return; }
-    } else {
-      res.status(403).json({ error: 'Accès refusé' }); return;
-    }
-  }
+  if (!canReadOffer(offer, req.auth)) { res.status(403).json({ error: 'Accès refusé' }); return; }
   res.json(offer);
+});
+
+offersRouter.get('/:id/attachments', requireRole('gestionnaire', 'lecteur', 'etudiant', 'entreprise'), (req, res) => {
+  const offer = getOfferById(Number(req.params.id));
+  if (!offer) { res.status(404).json({ error: 'Offre non trouvée' }); return; }
+  if (!canReadOffer(offer, req.auth)) { res.status(403).json({ error: 'Accès refusé' }); return; }
+  res.json(getOfferAttachments(offer.id));
 });
 
 // GET /:id/dependencies — gestionnaire only : entreprise/contacts encore en attente pour cette offre.
@@ -117,7 +99,7 @@ offersRouter.post('/:id/mark-unavailable', requireRole('gestionnaire'), (req, re
 offersRouter.patch('/:id', requireRole('gestionnaire', 'entreprise', 'etudiant'), (req, res) => {
   const offer = getOfferById(Number(req.params.id));
   if (!offer) { res.status(404).json({ error: 'Offre non trouvée' }); return; }
-  if (!canWrite(offer, req.auth)) { res.status(403).json({ error: 'Accès refusé' }); return; }
+  if (!canWriteOffer(offer, req.auth)) { res.status(403).json({ error: 'Accès refusé' }); return; }
   const result = PatchOfferSchema.safeParse(req.body);
   if (!result.success) { res.status(400).json({ error: result.error.flatten() }); return; }
   res.json(editOffer(Number(req.params.id), result.data));
@@ -136,19 +118,54 @@ offersRouter.patch('/:id/assignment', requireRole('gestionnaire'), (req, res) =>
   }
 });
 
-// POST /:id/attachment — gestionnaire/entreprise(own)/etudiant(own)
+// POST /:id/attachments — un fichier par appel, répété séquentiellement par le frontend.
 offersRouter.post(
-  '/:id/attachment',
+  '/:id/attachments',
   requireRole('gestionnaire', 'entreprise', 'etudiant'),
   (req, res) => {
     const offer = getOfferById(Number(req.params.id));
     if (!offer) { res.status(404).json({ error: 'Offre non trouvée' }); return; }
-    if (!canWrite(offer, req.auth)) { res.status(403).json({ error: 'Accès refusé' }); return; }
+    if (!canWriteOffer(offer, req.auth)) { res.status(403).json({ error: 'Accès refusé' }); return; }
 
     upload.single('file')(req, res, (err) => {
-      if (err) { res.status(400).json({ error: err.message }); return; }
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+        res.status(400).json({ error: 'Le fichier dépasse la limite de 5 Mo.' }); return;
+      }
+      if (err) { res.status(400).json({ error: err instanceof Error ? err.message : 'Fichier refusé.' }); return; }
       if (!req.file) { res.status(400).json({ error: 'Fichier manquant' }); return; }
-      res.json(attachFile(Number(req.params.id), req.file.path));
+      try {
+        res.status(201).json(addOfferAttachment(Number(req.params.id), req.file));
+      } catch (serviceError) {
+        handleServiceError(serviceError, res);
+      }
     });
   },
 );
+
+offersRouter.get('/:id/attachments/:attachmentId', requireRole('gestionnaire', 'lecteur', 'etudiant', 'entreprise'), (req, res) => {
+  const offer = getOfferById(Number(req.params.id));
+  if (!offer) { res.status(404).json({ error: 'Offre non trouvée' }); return; }
+  if (!canReadOffer(offer, req.auth)) { res.status(403).json({ error: 'Accès refusé' }); return; }
+  try {
+    const { attachment, path: filePath } = getOfferAttachmentDownload(offer.id, Number(req.params.attachmentId));
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.download(filePath, attachment.storage_name, (err) => {
+      if (err && !res.headersSent) res.status(404).json({ error: 'Pièce jointe non disponible' });
+    });
+  } catch (err) {
+    handleServiceError(err, res);
+  }
+});
+
+offersRouter.delete('/:id/attachments/:attachmentId', requireRole('gestionnaire', 'entreprise', 'etudiant'), (req, res) => {
+  const offer = getOfferById(Number(req.params.id));
+  if (!offer) { res.status(404).json({ error: 'Offre non trouvée' }); return; }
+  if (!canWriteOffer(offer, req.auth)) { res.status(403).json({ error: 'Accès refusé' }); return; }
+  try {
+    deleteOfferAttachmentById(offer.id, Number(req.params.attachmentId));
+    res.status(204).send();
+  } catch (err) {
+    handleServiceError(err, res);
+  }
+});

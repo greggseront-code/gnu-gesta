@@ -394,24 +394,60 @@ describe('offers backend', () => {
 
   // ─── Upload ──────────────────────────────────────────────────────
 
-  it('POST /api/offers/:id/attachment upload un fichier PDF', async () => {
+  it('POST /api/offers/:id/attachments upload un fichier PDF et le liste', async () => {
     const created = (await postAsManager(offer())).body;
     const pdfBuf = Buffer.from('%PDF-1.4 minimal');
     const res = await manager.agent
-      .post(`/api/offers/${created.id}/attachment`)
+      .post(`/api/offers/${created.id}/attachments`)
       .set('x-csrf-token', manager.csrfToken)
       .attach('file', pdfBuf, { filename: 'test.pdf', contentType: 'application/pdf' });
-    expect(res.status).toBe(200);
-    expect(res.body.attachment_path).toBeTruthy();
+    expect(res.status).toBe(201);
+    expect(res.body.storage_name).toMatch(/\.pdf$/);
+    expect(res.body.offer_id).toBe(created.id);
+    const list = await manager.agent.get(`/api/offers/${created.id}/attachments`);
+    expect(list.status).toBe(200);
+    expect(list.body).toHaveLength(1);
+    const attachment = list.body[0] as { id: number; storage_name: string };
+    const download = await manager.agent.get(`/api/offers/${created.id}/attachments/${attachment.id}`);
+    expect(download.status).toBe(200);
+    expect(download.headers['content-disposition']).toContain(`attachment; filename="${attachment.storage_name}"`);
+    expect(download.headers['x-content-type-options']).toBe('nosniff');
   });
 
-  it('POST /api/offers/:id/attachment rejette un fichier non autorisé', async () => {
+  it('POST /api/offers/:id/attachments rejette un fichier non autorisé', async () => {
     const created = (await postAsManager(offer())).body;
     const res = await manager.agent
-      .post(`/api/offers/${created.id}/attachment`)
+      .post(`/api/offers/${created.id}/attachments`)
       .set('x-csrf-token', manager.csrfToken)
       .attach('file', Buffer.from('data'), { filename: 'virus.exe', contentType: 'application/octet-stream' });
     expect(res.status).toBe(400);
+  });
+
+  it('permet plusieurs pièces jointes, limite à dix et supprime le fichier et sa ligne', async () => {
+    const created = (await postAsManager(offer())).body;
+    const uploaded: { id: number; storage_name: string }[] = [];
+    for (let index = 0; index < 10; index += 1) {
+      const response = await manager.agent
+        .post(`/api/offers/${created.id}/attachments`)
+        .set('x-csrf-token', manager.csrfToken)
+        .attach('file', Buffer.from(`%PDF-1.4 ${index}`), { filename: `document-${index}.pdf`, contentType: 'application/pdf' });
+      expect(response.status).toBe(201);
+      uploaded.push(response.body);
+    }
+    const rejected = await manager.agent
+      .post(`/api/offers/${created.id}/attachments`)
+      .set('x-csrf-token', manager.csrfToken)
+      .attach('file', Buffer.from('%PDF-1.4 extra'), { filename: 'extra.pdf', contentType: 'application/pdf' });
+    expect(rejected.status).toBe(409);
+    expect((await manager.agent.get(`/api/offers/${created.id}/attachments`)).body).toHaveLength(10);
+    const otherOffer = (await postAsManager({ ...offer(), description: 'Autre offre' })).body;
+    expect((await manager.agent.get(`/api/offers/${otherOffer.id}/attachments/${uploaded[0].id}`)).status).toBe(404);
+
+    const deleted = await manager.agent
+      .delete(`/api/offers/${created.id}/attachments/${uploaded[0].id}`)
+      .set('x-csrf-token', manager.csrfToken);
+    expect(deleted.status).toBe(204);
+    expect((await manager.agent.get(`/api/offers/${created.id}/attachments`)).body).toHaveLength(9);
   });
 
   it('GET /api/offers anonyme reçoit 401', async () => {

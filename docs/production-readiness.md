@@ -82,6 +82,11 @@ lecteur, et test des deux incarnations depuis le compte gestionnaire.
 
 ## Points d'attention (limitations connues, pas forcément bloquantes)
 
+* **Pièces jointes locales** : les documents de développement sont écrits
+  sous `backend/uploads/`, hors de la sauvegarde SQLite et sans réplication.
+  Un stockage durable et contrôlé devra être défini avant un usage de
+  production.
+
 * **Un seul gestionnaire** : l'adresse est figée dans `GESTA_MANAGER_EMAIL`
   (configuration, pas base de données). Pas de gestion dynamique de
   plusieurs comptes gestionnaire (hors périmètre V1, voir spec).

@@ -1,6 +1,6 @@
 import RawDatabase from 'better-sqlite3';
 import { createTestDb } from '../src/db/db.connection';
-import { runMigrations } from '../src/db/db.migrate';
+import { runMigrations, runSeed } from '../src/db/db.migrate';
 import type { Database } from 'better-sqlite3';
 
 let db: Database;
@@ -26,8 +26,32 @@ test('schema creates all required tables', () => {
   expect(names).toContain('company_contacts');
   expect(names).toContain('offer_contacts');
   expect(names).toContain('offers');
+  expect(names).toContain('offer_attachments');
   expect(names).toContain('applications');
   expect(names).toContain('offer_status_history');
+});
+
+test('le schéma frais ne conserve pas attachment_path et protège les métadonnées de pièce jointe', () => {
+  const offerColumns = db.prepare('PRAGMA table_info(offers)').all() as { name: string }[];
+  expect(offerColumns.map((column) => column.name)).not.toContain('attachment_path');
+
+  const offerId = (db.prepare('INSERT INTO companies (name, general_email) VALUES (?, ?) RETURNING id').get('Acme', 'a@a.com') as { id: number }).id;
+  const contactId = (db.prepare('INSERT INTO company_contacts (company_id, first_name, last_name, email, roles) VALUES (?, ?, ?, ?, ?) RETURNING id').get(offerId, 'Jean', 'Dupont', 'j@a.com', '[]') as { id: number }).id;
+  const actualOfferId = (db.prepare('INSERT INTO offers (company_id, priority_contact_id, description) VALUES (?, ?, ?) RETURNING id').get(offerId, contactId, 'Stage') as { id: number }).id;
+  db.prepare('INSERT INTO offer_attachments (offer_id, storage_name, mime_type, size_bytes) VALUES (?, ?, ?, ?)').run(actualOfferId, 'document.pdf', 'application/pdf', 10);
+
+  expect(() => db.prepare('INSERT INTO offer_attachments (offer_id, storage_name, mime_type, size_bytes) VALUES (?, ?, ?, ?)').run(actualOfferId, 'document.pdf', 'application/pdf', 10)).toThrow();
+  expect(() => db.prepare('INSERT INTO offer_attachments (offer_id, storage_name, mime_type, size_bytes) VALUES (?, ?, ?, ?)').run(actualOfferId, 'document.exe', 'application/octet-stream', 10)).toThrow();
+  expect(() => db.prepare('INSERT INTO offer_attachments (offer_id, storage_name, mime_type, size_bytes) VALUES (?, ?, ?, ?)').run(actualOfferId, 'large.pdf', 'application/pdf', 5 * 1024 * 1024 + 1)).toThrow();
+  db.prepare('DELETE FROM offers WHERE id = ?').run(actualOfferId);
+  expect((db.prepare('SELECT COUNT(*) as n FROM offer_attachments WHERE offer_id = ?').get(actualOfferId) as { n: number }).n).toBe(0);
+});
+
+test('runSeed peuple une base fraîche sans données de pièces jointes orphelines', () => {
+  runSeed(db);
+  expect((db.prepare('SELECT COUNT(*) as n FROM students').get() as { n: number }).n).toBeGreaterThan(0);
+  expect((db.prepare('SELECT COUNT(*) as n FROM offers').get() as { n: number }).n).toBeGreaterThan(0);
+  expect((db.prepare('SELECT COUNT(*) as n FROM offer_attachments').get() as { n: number }).n).toBe(0);
 });
 
 test('foreign keys are enforced', () => {

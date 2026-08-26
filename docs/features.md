@@ -280,9 +280,16 @@ des propositions étudiantes.
 * `PATCH /api/offers/:id` : modifier une offre.
 * `PATCH /api/offers/:id/assignment` : réaffecter atomiquement l'entreprise,
   le contact prioritaire et les contacts associés.
-* `POST /api/offers/:id/attachment` : rattacher une pièce jointe.
+* `GET /api/offers/:id/attachments` : lister les pièces jointes visibles.
+* `POST /api/offers/:id/attachments` : ajouter une pièce jointe multipart
+  (`file`), une par appel.
+* `GET /api/offers/:id/attachments/:attachmentId` : télécharger une pièce
+  jointe via l'URL protégée.
+* `DELETE /api/offers/:id/attachments/:attachmentId` : supprimer une pièce
+  jointe pour un auteur autorisé.
 * Types frontend principaux : `Offer`, `OfferInput`, `OfferStatus`,
-  `OfferSourceType`, `OfferAssignmentInput`, `OfferDependencyStatus`.
+  `OfferSourceType`, `OfferAttachment`, `OfferAssignmentInput`,
+  `OfferDependencyStatus`.
 
 ### Pages frontend concernées
 
@@ -302,6 +309,8 @@ des propositions étudiantes.
 * `frontend/src/features/offers/offers.types.ts`
 * `frontend/src/features/offers/offer-card.tsx`
 * `frontend/src/features/offers/offer-form.tsx`
+* `frontend/src/features/offers/offer-attachments.tsx`
+* `frontend/src/features/offers/offer-upload-status.tsx`
 * `frontend/src/components/status-badge.tsx`
 
 ### Backend lié
@@ -312,7 +321,13 @@ des propositions étudiantes.
 
 * Le statut `refusee` existe dans le code, mais reste à confirmer comme statut
   produit officiel.
-* Le cycle de vie des pièces jointes est minimal.
+* Une offre accepte zéro à dix fichiers PDF ou DOCX de 5 Mo maximum chacun.
+  La lecture suit les droits de consultation de l'offre, y compris pour un
+  étudiant ayant déjà postulé ; l'ajout et la suppression suivent les droits
+  d'écriture (gestionnaire, entreprise propriétaire, étudiant auteur).
+* Le stockage de développement est local sous `backend/uploads/` et n'est ni
+  sauvegardé avec SQLite ni adapté à une future production sans une phase de
+  remplacement dédiée.
 * `PATCH /api/offers/:id/company`, qui ne corrigeait que l'entreprise et
   laissait des contacts orphelins, a été retirée au profit de
   `PATCH /api/offers/:id/assignment`.
