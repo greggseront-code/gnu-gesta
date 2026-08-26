@@ -32,6 +32,13 @@ si un upload échoue.
   intermittents de fixtures d'authentification (`csrfToken`/URL de login) ;
   les suites directement concernées passent séquentiellement.
 
+### Validation manuelle complémentaire — 2026-08-26
+
+Le parcours a été testé sur le VPS par l'utilisateur et est confirmé
+fonctionnel. Le détail des rôles et des scénarios exécutés n'ayant pas été
+précisé, cette validation confirme le fonctionnement global sur l'environnement
+VPS sans cocher individuellement toute la matrice manuelle du plan.
+
 ## Observables
 
 * Une offre peut avoir jusqu'à dix documents PDF/DOCX de 5 Mo.
