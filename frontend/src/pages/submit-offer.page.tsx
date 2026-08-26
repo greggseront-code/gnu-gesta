@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, Navigate } from 'react-router-dom';
 import { getCompany } from '../features/companies/companies.api';
 import type { CompanyContact } from '../features/companies/companies.types';
-import { createOffer, updateOffer, getOffer, uploadOfferAttachment } from '../features/offers/offers.api';
+import { createOffer, updateOffer, getOffer, listOfferAttachments } from '../features/offers/offers.api';
 import type { Offer, OfferInput } from '../features/offers/offers.types';
 import { OfferForm } from '../features/offers/offer-form';
+import { OfferUploadStatus, uploadFilesSequentially, type FailedOfferUpload } from '../features/offers/offer-upload-status';
 import { useAuth } from '../context/auth-context';
 
 export function SubmitOfferPage() {
@@ -18,6 +19,8 @@ export function SubmitOfferPage() {
   const [existingOffer, setExistingOffer] = useState<Offer | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [existingAttachmentCount, setExistingAttachmentCount] = useState(0);
+  const [partialUploads, setPartialUploads] = useState<{ offerId: number; uploadedCount: number; failures: FailedOfferUpload[] } | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -26,6 +29,8 @@ export function SubmitOfferPage() {
           const offer = await getOffer(Number(id));
           setExistingOffer(offer);
           setSelectedContactId(offer.priority_contact_id);
+          const attachments = await listOfferAttachments(offer.id);
+          setExistingAttachmentCount(attachments?.length ?? 0);
           // Load contacts for the offer's company
           const company = await getCompany(offer.company_id);
           setContacts(company.contacts);
@@ -55,8 +60,8 @@ export function SubmitOfferPage() {
     ? (existingOffer?.company_id ?? entityId ?? 0)
     : (entityId ?? 0);
 
-  async function handleSubmit(data: OfferInput & { file?: File }) {
-    const { file, ...offerData } = data;
+  async function handleSubmit(data: OfferInput & { files: File[] }) {
+    const { files, ...offerData } = data;
     const finalData = { ...offerData };
 
     let savedOffer: Offer;
@@ -66,11 +71,29 @@ export function SubmitOfferPage() {
       savedOffer = await createOffer(finalData);
     }
 
-    if (file) {
-      await uploadOfferAttachment(savedOffer.id, file);
+    if (files.length > 0) {
+      const result = await uploadFilesSequentially(savedOffer.id, files);
+      if (result.failed.length > 0) {
+        setPartialUploads({ offerId: savedOffer.id, uploadedCount: result.succeeded.length, failures: result.failed });
+        return;
+      }
     }
 
     navigate(`/offers/${savedOffer.id}`);
+  }
+
+  async function retryFailedUploads() {
+    if (!partialUploads) return;
+    const result = await uploadFilesSequentially(partialUploads.offerId, partialUploads.failures.map(({ file }) => file));
+    if (result.failed.length > 0) {
+      setPartialUploads({
+        offerId: partialUploads.offerId,
+        uploadedCount: partialUploads.uploadedCount + result.succeeded.length,
+        failures: result.failed,
+      });
+      return;
+    }
+    navigate(`/offers/${partialUploads.offerId}`);
   }
 
   if (loading) return <p className="text-muted">Chargement…</p>;
@@ -130,13 +153,24 @@ export function SubmitOfferPage() {
 
       <div className="card">
         <div className="card-body">
-          <OfferForm
-            companyId={resolvedCompanyId}
-            contactId={selectedContactId ?? undefined}
-            initialValues={initialValues}
-            onSubmit={handleSubmit}
-            submitLabel={isEdit ? "Enregistrer les modifications" : "Soumettre l'offre"}
-          />
+          {partialUploads ? (
+            <OfferUploadStatus
+              offerId={partialUploads.offerId}
+              uploadedCount={partialUploads.uploadedCount}
+              failures={partialUploads.failures}
+              onRetry={retryFailedUploads}
+              onContinue={() => navigate(`/offers/${partialUploads.offerId}`)}
+            />
+          ) : (
+            <OfferForm
+              companyId={resolvedCompanyId}
+              contactId={selectedContactId ?? undefined}
+              initialValues={initialValues}
+              existingAttachmentCount={existingAttachmentCount}
+              onSubmit={handleSubmit}
+              submitLabel={isEdit ? "Enregistrer les modifications" : "Soumettre l'offre"}
+            />
+          )}
         </div>
       </div>
     </div>

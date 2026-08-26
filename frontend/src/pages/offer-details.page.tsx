@@ -5,6 +5,7 @@ import type { Offer } from '../features/offers/offers.types';
 import { StatusBadge } from '../components/status-badge';
 import { useAuth } from '../context/auth-context';
 import { applyToOffer } from '../features/applications/applications.api';
+import { OfferAttachments } from '../features/offers/offer-attachments';
 
 export function OfferDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -39,7 +40,7 @@ export function OfferDetailsPage() {
   if (!offer) return <p className="text-muted">Chargement…</p>;
 
   const o = offer;
-  const canEdit = role === 'entreprise' || role === 'gestionnaire';
+  const canEdit = role === 'entreprise' || role === 'gestionnaire' || (role === 'etudiant' && o.submitted_by_student_id === entityId);
   const canManage = role === 'gestionnaire' && o.status === 'soumise';
   const canApply = role === 'etudiant' && o.status === 'validee_et_visible' && entityId != null;
 
@@ -167,23 +168,7 @@ export function OfferDetailsPage() {
         </div>
       </div>
 
-      {offer.attachment_path && (
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">Pièce jointe</span>
-          </div>
-          <div className="card-body">
-            <a
-              href={`/api/offers/${offer.id}/attachment`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary btn-sm"
-            >
-              Télécharger la pièce jointe
-            </a>
-          </div>
-        </div>
-      )}
+      <OfferAttachments offer={offer} role={role} entityId={entityId} />
 
       <div style={{ marginTop: '0.5rem' }}>
         <Link to="/offers" className="btn btn-secondary">← Retour aux offres</Link>

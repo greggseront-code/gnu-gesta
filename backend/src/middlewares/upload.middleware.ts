@@ -1,29 +1,19 @@
 import multer from 'multer';
-import path from 'path';
-import { mkdirSync } from 'fs';
+import { createAttachmentStorage, extensionForAttachment, DEFAULT_UPLOADS_ROOT, MAX_ATTACHMENT_SIZE_BYTES } from '../features/offers/offer-attachments.storage';
 
-const UPLOADS_DIR = path.join(__dirname, '../../uploads');
-mkdirSync(UPLOADS_DIR, { recursive: true });
-
-const ALLOWED_MIMES = [
-  'application/pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-];
-
-export const upload = multer({
-  storage: multer.diskStorage({
-    destination: UPLOADS_DIR,
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname);
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+export function createUploadMiddleware(root = DEFAULT_UPLOADS_ROOT) {
+  return multer({
+    storage: createAttachmentStorage(root),
+    limits: { fileSize: MAX_ATTACHMENT_SIZE_BYTES },
+    fileFilter: (_req, file, cb) => {
+      try {
+        extensionForAttachment(file.originalname, file.mimetype);
+        cb(null, true);
+      } catch (err) {
+        cb(err instanceof Error ? err : new Error('Type de fichier non autorisé. PDF ou DOCX uniquement.'));
+      }
     },
-  }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (ALLOWED_MIMES.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Type de fichier non autorisé. PDF ou DOCX uniquement.'));
-    }
-  },
-});
+  });
+}
+
+export const upload = createUploadMiddleware();

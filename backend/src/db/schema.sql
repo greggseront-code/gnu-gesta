@@ -81,7 +81,6 @@ CREATE TABLE IF NOT EXISTS offers (
   remote_allowed          INTEGER NOT NULL DEFAULT 0,
   remote_percentage       INTEGER,
   remarks                 TEXT,
-  attachment_path         TEXT,
   status                  TEXT    NOT NULL DEFAULT 'soumise'
                             CHECK(status IN ('soumise', 'validee_et_visible', 'prise', 'non_disponible', 'refusee')),
   submitted_by_student_id INTEGER          REFERENCES students(id),
@@ -90,6 +89,21 @@ CREATE TABLE IF NOT EXISTS offers (
   created_at              TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at              TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS offer_attachments (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  offer_id     INTEGER NOT NULL REFERENCES offers(id) ON DELETE CASCADE,
+  storage_name TEXT    NOT NULL UNIQUE CHECK(length(storage_name) > 0),
+  mime_type    TEXT    NOT NULL CHECK(mime_type IN (
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  )),
+  size_bytes   INTEGER NOT NULL CHECK(size_bytes >= 0 AND size_bytes <= 5242880),
+  created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_offer_attachments_offer_id
+  ON offer_attachments(offer_id, created_at, id);
 
 CREATE TABLE IF NOT EXISTS offer_contacts (
   offer_id    INTEGER NOT NULL REFERENCES offers(id) ON DELETE CASCADE,

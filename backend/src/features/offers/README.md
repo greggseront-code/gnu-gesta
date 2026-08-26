@@ -13,7 +13,10 @@
 * `PATCH /api/offers/:id` : modifie les champs descriptifs d'une offre.
 * `PATCH /api/offers/:id/assignment` : remplace atomiquement l'entreprise, le
   contact prioritaire et les contacts associés d'une offre.
-* `POST /api/offers/:id/attachment` : rattache une pièce jointe.
+* `GET /api/offers/:id/attachments` : liste les pièces jointes visibles.
+* `POST /api/offers/:id/attachments` : ajoute un fichier multipart `file`.
+* `GET /api/offers/:id/attachments/:attachmentId` : télécharge un fichier.
+* `DELETE /api/offers/:id/attachments/:attachmentId` : supprime un fichier.
 
 ## Modèle de domaine
 
@@ -29,7 +32,6 @@ Champs structurants :
 * `objectives`
 * `remote_allowed`
 * `remote_percentage`
-* `attachment_path`
 * `status`
 * `submitted_by_student_id`
 * `created_by_company_id`
@@ -81,12 +83,16 @@ comme statut produit officiel.
 * `remote_percentage` est requis quand `remote_allowed` vaut `true`.
 * Les changements de statut sont historisés, y compris la publication
   directe d'une offre créée par le gestionnaire.
+* Une offre contient au maximum dix pièces jointes PDF ou DOCX de 5 Mo chacune.
+  Le service compte et insère les métadonnées dans une transaction ; tout
+  fichier rejeté après écriture est nettoyé.
 
 ## Accès données
 
 Tables utilisées :
 
-* `offers` : création, lecture, recherche, modification, statut et pièce jointe.
+* `offers` : création, lecture, recherche, modification et statut.
+* `offer_attachments` : métadonnées des documents rattachés aux offres.
 * `offer_contacts` : rattachement des contacts à une offre ; remplacé
   entièrement lors d'une réaffectation.
 * `companies`, `company_contacts` : vérification de visibilité à la création
@@ -105,7 +111,9 @@ Points d'attention :
   contacts orphelins de l'ancienne entreprise, a été retirée après migration
   de son seul appelant frontend (`admin-offers.page.tsx`) vers
   `PATCH /:id/assignment`.
-* La pièce jointe est stockée comme chemin dans `offers.attachment_path`.
+* Le fichier physique n'est jamais exposé comme chemin local : seul son nom
+  technique est persisté dans `offer_attachments.storage_name`, puis résolu
+  sous `backend/uploads/` par le helper de stockage.
 
 Voir aussi : `docs/data-model.md`.
 
@@ -116,6 +124,9 @@ Voir aussi : `docs/data-model.md`.
   anonyme), puis visibilité calculée selon rôle, statut, auteur et
   candidatures.
 * `GET /api/offers/:id/dependencies` : `gestionnaire` uniquement.
+* `GET /api/offers/:id/attachments` et `GET /api/offers/:id/attachments/:attachmentId` :
+  mêmes règles de lecture que le détail de l'offre, y compris l'étudiant ayant
+  déjà postulé.
 * `POST /api/offers` : `gestionnaire`, `etudiant`, `entreprise`.
 * `POST /api/offers/:id/validate` : `gestionnaire`.
 * `POST /api/offers/:id/reject` : `gestionnaire`.
@@ -123,8 +134,8 @@ Voir aussi : `docs/data-model.md`.
 * `PATCH /api/offers/:id` : `gestionnaire`, entreprise propriétaire ou étudiant
   auteur.
 * `PATCH /api/offers/:id/assignment` : `gestionnaire` uniquement.
-* `POST /api/offers/:id/attachment` : `gestionnaire`, entreprise propriétaire
-  ou étudiant auteur.
+* `POST /api/offers/:id/attachments` et `DELETE /api/offers/:id/attachments/:attachmentId` :
+  gestionnaire, entreprise propriétaire ou étudiant auteur.
 
 ## Tests back
 
@@ -145,7 +156,8 @@ Scénarios importants :
 * Filtrage par rôle et recherche, y compris l'exclusion des offres `soumise`
   pour le lecteur et entre deux étudiants distincts.
 * Validation, refus et passage à `non_disponible`.
-* Modification, upload de pièce jointe et rejet des fichiers non autorisés.
+* Modification, liste, upload multiple, téléchargement, suppression et rejet
+  des fichiers non autorisés.
 * Cycle complet : proposition étudiante avec entreprise en attente, contrôle
   gestionnaire, validation de l'offre, visibilité pour un autre étudiant.
 

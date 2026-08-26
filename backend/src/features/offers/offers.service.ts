@@ -12,9 +12,23 @@ import {
   findOfferById as findOfferByIdQuery,
   updateOfferStatus,
   updateOffer as updateOfferQuery,
-  updateOfferAttachment,
   replaceOfferAssignment,
+  listOfferAttachments,
+  countOfferAttachments,
+  insertOfferAttachment,
+  findOfferAttachment,
+  deleteOfferAttachment,
+  hasStudentAppliedToOffer,
 } from './offers.queries';
+import {
+  attachmentExists,
+  removeAttachment,
+  resolveStoredAttachment,
+  validateStoredAttachmentMetadata,
+  AttachmentStorageError,
+  MAX_ATTACHMENT_SIZE_BYTES,
+} from './offer-attachments.storage';
+import type { OfferAttachment } from './offers.types';
 
 interface AuthContext {
   role: Role | null;
@@ -102,6 +116,23 @@ export function getOfferById(id: number): Offer | null {
   return findOfferByIdQuery(getDb(), id);
 }
 
+export function canReadOffer(offer: Offer, auth: AuthContext): boolean {
+  if (auth.role === 'gestionnaire') return true;
+  if (auth.role === 'lecteur') return offer.status !== 'soumise';
+  if (auth.role === 'entreprise') return offer.company_id === auth.entityId;
+  if (auth.role === 'etudiant' && auth.entityId != null) {
+    if (offer.status === 'validee_et_visible' || offer.submitted_by_student_id === auth.entityId) return true;
+    return offer.status !== 'non_disponible' && hasStudentAppliedToOffer(getDb(), offer.id, auth.entityId);
+  }
+  return false;
+}
+
+export function canWriteOffer(offer: Offer, auth: AuthContext): boolean {
+  if (auth.role === 'gestionnaire') return true;
+  if (auth.role === 'entreprise') return offer.company_id === auth.entityId;
+  return auth.role === 'etudiant' && offer.submitted_by_student_id === auth.entityId;
+}
+
 export function getOfferDependencyStatus(id: number): OfferDependencyStatus | null {
   const db = getDb();
   const offer = findOfferByIdQuery(db, id);
@@ -182,6 +213,87 @@ export function reassignOffer(id: number, input: OfferAssignmentInput): Offer {
   return replaceOfferAssignment(db, id, input);
 }
 
-export function attachFile(id: number, filePath: string): Offer {
-  return updateOfferAttachment(getDb(), id, filePath);
+export function getOfferAttachments(id: number): OfferAttachment[] {
+  return listOfferAttachments(getDb(), id);
+}
+
+export interface UploadedOfferFile {
+  filename: string;
+  mimetype: string;
+  size: number;
+}
+
+const MAX_OFFER_ATTACHMENTS = 10;
+
+export function addOfferAttachment(offerId: number, file: UploadedOfferFile): OfferAttachment {
+  const db = getDb();
+  const offer = findOfferByIdQuery(db, offerId);
+  if (!offer) {
+    cleanupUploadedFile(file.filename);
+    throw new NotFoundError('Offre non trouvée');
+  }
+
+  try {
+    validateStoredAttachmentMetadata(file.filename, file.mimetype);
+    if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+      throw new BadRequestError('Le fichier dépasse la limite de 5 Mo.');
+    }
+    const attachment = db.transaction(() => {
+      if (countOfferAttachments(db, offerId) >= MAX_OFFER_ATTACHMENTS) {
+        throw new ConflictError('Une offre ne peut pas contenir plus de 10 pièces jointes.');
+      }
+      return insertOfferAttachment(db, {
+        offer_id: offerId,
+        storage_name: file.filename,
+        mime_type: file.mimetype,
+        size_bytes: file.size,
+      });
+    })();
+    return attachment;
+  } catch (err) {
+    cleanupUploadedFile(file.filename);
+    throw err;
+  }
+}
+
+export function getOfferAttachmentDownload(offerId: number, attachmentId: number): { attachment: OfferAttachment; path: string } {
+  const attachment = findOfferAttachment(getDb(), offerId, attachmentId);
+  if (!attachment) throw new NotFoundError('Pièce jointe non trouvée');
+  try {
+    const filePath = resolveStoredAttachment(attachment.storage_name);
+    if (!attachmentExists(attachment.storage_name)) {
+      console.warn(`[offers] fichier physique absent pour la pièce jointe ${attachment.id}`);
+      throw new AttachmentStorageError('missing', 'Pièce jointe absente du stockage.');
+    }
+    return { attachment, path: filePath };
+  } catch (err) {
+    if (err instanceof AttachmentStorageError) throw new NotFoundError('Pièce jointe non disponible');
+    throw err;
+  }
+}
+
+export function deleteOfferAttachmentById(offerId: number, attachmentId: number): void {
+  const db = getDb();
+  const attachment = findOfferAttachment(db, offerId, attachmentId);
+  if (!attachment) throw new NotFoundError('Pièce jointe non trouvée');
+  try {
+    removeAttachment(attachment.storage_name);
+  } catch (err) {
+    if (err instanceof AttachmentStorageError) {
+      console.warn(`[offers] fichier physique incohérent pour la pièce jointe ${attachment.id}`);
+    } else {
+      throw err;
+    }
+  }
+  deleteOfferAttachment(db, offerId, attachmentId);
+}
+
+function cleanupUploadedFile(storageName: string): void {
+  try {
+    removeAttachment(storageName);
+  } catch (err) {
+    if (!(err instanceof AttachmentStorageError && err.code === 'missing')) {
+      console.warn('[offers] nettoyage du fichier uploadé impossible');
+    }
+  }
 }

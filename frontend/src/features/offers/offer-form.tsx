@@ -1,15 +1,23 @@
 import { useState } from 'react';
 import type { OfferInput } from './offers.types';
 
+const MAX_FILES = 10;
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MIME_BY_EXTENSION: Record<string, string> = {
+  '.pdf': 'application/pdf',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
+
 interface OfferFormProps {
   companyId: number;
   contactId?: number;
   initialValues?: Partial<OfferInput>;
-  onSubmit: (data: OfferInput & { file?: File }) => Promise<void>;
+  existingAttachmentCount?: number;
+  onSubmit: (data: OfferInput & { files: File[] }) => Promise<void>;
   submitLabel: string;
 }
 
-export function OfferForm({ companyId, contactId, initialValues, onSubmit, submitLabel }: OfferFormProps) {
+export function OfferForm({ companyId, contactId, initialValues, existingAttachmentCount = 0, onSubmit, submitLabel }: OfferFormProps) {
   const [description, setDescription] = useState(initialValues?.description ?? '');
   const [location, setLocation] = useState(initialValues?.location ?? '');
   const [technologies, setTechnologies] = useState(initialValues?.technologies ?? '');
@@ -19,7 +27,8 @@ export function OfferForm({ companyId, contactId, initialValues, onSubmit, submi
     initialValues?.remote_percentage != null ? String(initialValues.remote_percentage) : '',
   );
   const [remarks, setRemarks] = useState(initialValues?.remarks ?? '');
-  const [file, setFile] = useState<File | undefined>(undefined);
+  const [files, setFiles] = useState<File[]>([]);
+  const [fileErrors, setFileErrors] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -39,7 +48,7 @@ export function OfferForm({ companyId, contactId, initialValues, onSubmit, submi
       return;
     }
 
-    const data: OfferInput & { file?: File } = {
+    const data: OfferInput & { files: File[] } = {
       company_id: companyId,
       priority_contact_id: priorityContactId,
       contact_ids: [priorityContactId],
@@ -50,7 +59,7 @@ export function OfferForm({ companyId, contactId, initialValues, onSubmit, submi
       remote_allowed: remoteAllowed,
       remote_percentage: remoteAllowed && remotePercentage !== '' ? Number(remotePercentage) : undefined,
       remarks: remarks || undefined,
-      file,
+      files,
     };
 
     setSubmitting(true);
@@ -153,13 +162,55 @@ export function OfferForm({ companyId, contactId, initialValues, onSubmit, submi
       </div>
 
       <div className="form-group">
-        <label className="form-label">Pièce jointe (PDF ou DOCX, max 5 Mo)</label>
+        <label className="form-label">Pièces jointes (PDF ou DOCX, 5 Mo maximum par fichier, 10 fichiers)</label>
         <input
           type="file"
+          multiple
           accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          onChange={(e) => setFile(e.target.files?.[0])}
+          onChange={(e) => {
+            const selected = Array.from(e.target.files ?? []);
+            const errors: string[] = [];
+            const remaining = MAX_FILES - existingAttachmentCount;
+            if (selected.length > remaining) {
+              errors.push(`Vous pouvez encore ajouter ${Math.max(remaining, 0)} fichier(s) à cette offre.`);
+            }
+            const valid: File[] = [];
+            selected.slice(0, Math.max(remaining, 0)).forEach((file) => {
+              const extension = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+              if (!MIME_BY_EXTENSION[extension]) {
+                errors.push(`${file.name} : extension non autorisée (PDF ou DOCX uniquement).`);
+              } else if (file.type !== MIME_BY_EXTENSION[extension]) {
+                errors.push(`${file.name} : type MIME incohérent avec son extension.`);
+              } else if (file.size > MAX_FILE_SIZE) {
+                errors.push(`${file.name} : la taille dépasse 5 Mo.`);
+              } else {
+                valid.push(file);
+              }
+            });
+            setFiles(valid);
+            setFileErrors(errors);
+            e.currentTarget.value = '';
+          }}
           className="form-input"
         />
+        <span className="form-hint">{files.length} fichier(s) sélectionné(s), {Math.max(MAX_FILES - existingAttachmentCount - files.length, 0)} place(s) restante(s)</span>
+        {files.length > 0 && (
+          <ul style={{ marginTop: '0.5rem', paddingLeft: '1.25rem' }}>
+            {files.map((file, index) => (
+              <li key={`${file.name}-${file.lastModified}-${index}`}>
+                {file.name}{' '}
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}>
+                  Retirer
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {fileErrors.length > 0 && (
+          <div className="alert alert-error" style={{ marginTop: '0.5rem' }}>
+            <ul style={{ paddingLeft: '1.25rem' }}>{fileErrors.map((message) => <li key={message}>{message}</li>)}</ul>
+          </div>
+        )}
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}

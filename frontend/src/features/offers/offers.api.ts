@@ -1,5 +1,5 @@
 import { apiFetch, getCsrfToken } from '../../lib/api-client';
-import type { Offer, OfferAssignmentInput, OfferDependencyStatus, OfferInput } from './offers.types';
+import type { Offer, OfferAssignmentInput, OfferAttachment, OfferDependencyStatus, OfferInput } from './offers.types';
 
 export function listVisibleOffers(search?: string): Promise<Offer[]> {
   const qs = search ? `?search=${encodeURIComponent(search)}` : '';
@@ -60,14 +60,22 @@ export function reassignOffer(id: number, input: OfferAssignmentInput): Promise<
   });
 }
 
-export async function uploadOfferAttachment(offerId: number, file: File): Promise<Offer> {
+export function listOfferAttachments(offerId: number): Promise<OfferAttachment[]> {
+  return apiFetch<OfferAttachment[]>(`/offers/${offerId}/attachments`);
+}
+
+export function getOfferAttachmentUrl(offerId: number, attachmentId: number): string {
+  return `/api/offers/${offerId}/attachments/${attachmentId}`;
+}
+
+export async function uploadOfferAttachment(offerId: number, file: File): Promise<OfferAttachment> {
   const formData = new FormData();
   formData.append('file', file);
 
   // Do not use apiFetch here: FormData must let the browser set the
   // multipart boundary, so Content-Type cannot be forced to application/json.
   const csrfToken = getCsrfToken();
-  const res = await fetch(`/api/offers/${offerId}/attachment`, {
+  const res = await fetch(`/api/offers/${offerId}/attachments`, {
     method: 'POST',
     credentials: 'include',
     headers: csrfToken ? { 'x-csrf-token': csrfToken } : {},
@@ -79,5 +87,9 @@ export async function uploadOfferAttachment(offerId: number, file: File): Promis
     throw new Error((body as { error?: string }).error ?? `${res.status} ${res.statusText}`);
   }
 
-  return res.json() as Promise<Offer>;
+  return res.json() as Promise<OfferAttachment>;
+}
+
+export function deleteOfferAttachment(offerId: number, attachmentId: number): Promise<void> {
+  return apiFetch<void>(`/offers/${offerId}/attachments/${attachmentId}`, { method: 'DELETE' });
 }

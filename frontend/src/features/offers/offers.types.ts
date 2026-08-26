@@ -20,7 +20,6 @@ export interface Offer {
   remote_allowed: number;
   remote_percentage: number | null;
   remarks: string | null;
-  attachment_path: string | null;
   status: OfferStatus;
   submitted_by_student_id: number | null;
   created_by_company_id: number | null;
@@ -40,6 +39,19 @@ export interface OfferInput {
   remote_allowed: boolean;
   remote_percentage?: number;
   remarks?: string;
+}
+
+export type OfferAttachmentMimeType =
+  | 'application/pdf'
+  | 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+export interface OfferAttachment {
+  id: number;
+  offer_id: number;
+  storage_name: string;
+  mime_type: OfferAttachmentMimeType;
+  size_bytes: number;
+  created_at: string;
 }
 
 export interface OfferAssignmentInput {
