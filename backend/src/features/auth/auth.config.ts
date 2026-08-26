@@ -14,6 +14,91 @@ const AuthEnvSchema = z.object({
   GESTA_MANAGER_EMAIL: z.string().email(),
 });
 
+const AuthModeSchema = z.enum(['entra', 'dev']);
+
+export type AuthMode = z.infer<typeof AuthModeSchema>;
+
+export interface AuthModeParseResult {
+  success: boolean;
+  data?: AuthMode;
+  error?: string;
+}
+
+/** `entra` reste le défaut : une activation locale doit être explicite. */
+export function parseAuthMode(value: string | undefined): AuthModeParseResult {
+  const result = AuthModeSchema.safeParse(value ?? 'entra');
+  if (!result.success) {
+    return { success: false, error: 'AUTH_MODE doit valoir "entra" ou "dev".' };
+  }
+  return { success: true, data: result.data };
+}
+
+export function loadAuthMode(): AuthMode {
+  // La suite automatisee utilise le faux fournisseur Entra et doit rester
+  // independante du .env local du developpeur.
+  if (process.env.NODE_ENV === 'test') return 'entra';
+
+  const result = parseAuthMode(process.env.AUTH_MODE);
+  if (!result.success) {
+    throw new Error(`Configuration d'authentification invalide : ${result.error}`);
+  }
+  return result.data!;
+}
+
+/** Hôtes acceptables pour un service explicitement limité à la machine locale. */
+export function isLoopbackHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase().replace(/^\[|\]$/g, '');
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
+}
+
+function isLocalHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' && isLoopbackHost(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+const DevAuthEnvSchema = z.object({
+  APP_BASE_URL: z.string().url().refine(isLocalHttpUrl, 'APP_BASE_URL doit être une URL HTTP locale.'),
+  SESSION_SECRET: z.string().min(16),
+  GESTA_MANAGER_EMAIL: z.string().email(),
+  HOST: z.string().default('127.0.0.1').refine(isLoopbackHost, 'HOST doit être localhost, 127.0.0.1 ou ::1.'),
+});
+
+export type DevAuthConfig = z.infer<typeof DevAuthEnvSchema>;
+
+export type DevAuthConfigParseResult =
+  | { success: true; data: DevAuthConfig }
+  | { success: false; missing: string[] };
+
+export function parseDevAuthConfig(
+  env: Partial<Record<string, string | undefined>>,
+): DevAuthConfigParseResult {
+  const result = DevAuthEnvSchema.safeParse(env);
+  if (result.success) {
+    return { success: true, data: result.data };
+  }
+  const missing = [...new Set(result.error.issues.map((issue) => String(issue.path[0])))];
+  return { success: false, missing };
+}
+
+export function loadDevAuthConfig(): DevAuthConfig {
+  if (process.env.NODE_ENV !== 'development') {
+    throw new Error('AUTH_MODE=dev est autorisé uniquement avec NODE_ENV=development.');
+  }
+
+  const result = parseDevAuthConfig(process.env);
+  if (!result.success) {
+    throw new Error(
+      `Configuration d'authentification locale incomplete ou invalide : ${result.missing.join(', ')}. ` +
+        'Voir backend/.env.example.',
+    );
+  }
+  return result.data;
+}
+
 export type AuthConfig = z.infer<typeof AuthEnvSchema>;
 
 export type AuthConfigParseResult =

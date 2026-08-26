@@ -778,6 +778,16 @@ a:hover {
 
 /* ===================== IMPERSONATION BANNER ===================== */
 
+.dev-auth-banner {
+  padding: 0.625rem 2.5rem;
+  background: var(--color-warning-light);
+  border-bottom: 1px solid #fcd34d;
+  color: #92400e;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .impersonation-banner {
   display: flex;
   align-items: center;

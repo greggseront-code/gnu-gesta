@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseAuthConfig } from '../src/features/auth/auth.config';
+import { parseAuthConfig, parseAuthMode, parseDevAuthConfig } from '../src/features/auth/auth.config';
 
 const VALID_ENV = {
   ENTRA_TENANT_ID: 'tenant-123',
@@ -69,5 +69,34 @@ describe('parseAuthConfig', () => {
         ].sort(),
       );
     }
+  });
+});
+
+describe('configuration du mode d’authentification locale', () => {
+  const DEV_ENV = {
+    APP_BASE_URL: 'http://localhost:5173',
+    SESSION_SECRET: 'a-long-enough-dev-session-secret',
+    GESTA_MANAGER_EMAIL: 'gregory.seront@vinci.be',
+    HOST: '127.0.0.1',
+  };
+
+  it('conserve Entra par défaut', () => {
+    expect(parseAuthMode(undefined)).toEqual({ success: true, data: 'entra' });
+  });
+
+  it('n’accepte que les modes explicites connus', () => {
+    expect(parseAuthMode('dev')).toEqual({ success: true, data: 'dev' });
+    expect(parseAuthMode('local_test')).toMatchObject({ success: false });
+  });
+
+  it('accepte une configuration locale liée à la boucle locale', () => {
+    const result = parseDevAuthConfig(DEV_ENV);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.HOST).toBe('127.0.0.1');
+  });
+
+  it('refuse une URL publique ou une adresse d’écoute publique', () => {
+    expect(parseDevAuthConfig({ ...DEV_ENV, APP_BASE_URL: 'https://gng.seront.be' }).success).toBe(false);
+    expect(parseDevAuthConfig({ ...DEV_ENV, HOST: '0.0.0.0' }).success).toBe(false);
   });
 });

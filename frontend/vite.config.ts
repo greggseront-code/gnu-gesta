@@ -4,7 +4,9 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true,
+    // Le sélecteur AUTH_MODE=dev ne doit pas devenir accessible depuis le
+    // réseau local via le serveur Vite.
+    host: '127.0.0.1',
     proxy: {
       '/api': 'http://localhost:3000',
     },

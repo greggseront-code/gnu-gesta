@@ -21,6 +21,7 @@ import { CompanyDashboardPage } from '../pages/company-dashboard.page';
 import { StudentApplicationsPage } from '../pages/student-applications.page';
 import { AdminApplicationsPage } from '../pages/admin-applications.page';
 import { ImpersonationSelectPage } from '../pages/impersonation-select.page';
+import { DevLoginPage } from '../pages/dev-login.page';
 
 function AuthGate({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -57,6 +58,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/dev-login" element={<DevLoginPage />} />
       <Route path="/auth-check" element={<AuthCheckPage />} />
       <Route path="/account-not-linked" element={<AccountNotLinkedPage />} />
 

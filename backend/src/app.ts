@@ -9,6 +9,8 @@ import {
   isProductionLikeEnvironment,
   loadAuthConfig,
   loadAuthConfigOrNull,
+  loadAuthMode,
+  loadDevAuthConfig,
 } from './features/auth/auth.config';
 import { SqliteSessionStore } from './features/auth/session.store';
 import { authRouter } from './features/auth/auth.routes';
@@ -27,8 +29,12 @@ app.use(express.json({ limit: '5mb' }));
 // docs/deployment.md et backend/.env.example). En dev/test, une config
 // absente ne degrade que /api/auth/* (voir requireAuthConfig dans
 // auth.routes.ts), jamais le reste de l'application.
-const authConfig = isProductionLikeEnvironment() ? loadAuthConfig() : loadAuthConfigOrNull();
-if (!authConfig && process.env.NODE_ENV !== 'test') {
+const authMode = loadAuthMode();
+const devAuthConfig = authMode === 'dev' ? loadDevAuthConfig() : null;
+const authConfig = authMode === 'entra'
+  ? isProductionLikeEnvironment() ? loadAuthConfig() : loadAuthConfigOrNull()
+  : null;
+if (authMode === 'entra' && !authConfig && process.env.NODE_ENV !== 'test') {
   console.warn(
     '[auth] Configuration Entra manquante ou invalide : /api/auth/* restera indisponible ' +
       'tant que backend/.env n\'est pas complete (voir backend/.env.example).',
@@ -45,7 +51,7 @@ app.use(
   session({
     store: new SqliteSessionStore(),
     name: 'gesta.sid',
-    secret: authConfig?.SESSION_SECRET ?? getFallbackSessionSecret(),
+    secret: devAuthConfig?.SESSION_SECRET ?? authConfig?.SESSION_SECRET ?? getFallbackSessionSecret(),
     resave: false,
     rolling: true,
     saveUninitialized: false,

@@ -1,6 +1,6 @@
-import { Router, type Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
-import { loadAuthConfig } from './auth.config';
+import { loadAuthConfig, loadAuthMode, loadDevAuthConfig, isLoopbackHost } from './auth.config';
 import { getEntraProvider } from './entra.client';
 import {
   buildLoginRequest,
@@ -13,11 +13,54 @@ import {
 import { getDb } from '../../db/db.connection';
 import { findStudentById } from '../students/students.queries';
 import { findCompanyById } from '../companies/companies.queries';
+import {
+  DEV_AUTH_FIXTURE_NAMES,
+  buildDevAuthSession,
+  listDevAuthFixtures,
+} from './dev-auth';
+import type { DevAuthFixtureName } from './dev-auth';
 
 export const authRouter = Router();
 
 function firstString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
+}
+
+function isLoopbackAddress(address: string | undefined): boolean {
+  if (!address) return false;
+  if (isLoopbackHost(address)) return true;
+  return address.startsWith('::ffff:') && isLoopbackHost(address.slice('::ffff:'.length));
+}
+
+function requireLocalDevAuth(req: Request, res: Response) {
+  let mode;
+  try {
+    mode = loadAuthMode();
+  } catch (e) {
+    res.status(500).json({ error: 'auth_mode_invalid', message: e instanceof Error ? e.message : 'Mode d’authentification invalide.' });
+    return null;
+  }
+
+  if (mode !== 'dev') {
+    // Ne révèle pas l’existence du sélecteur local lorsque le mode Entra est actif.
+    res.status(404).json({ error: 'not_found' });
+    return null;
+  }
+
+  if (!isLoopbackAddress(req.socket.remoteAddress)) {
+    res.status(403).json({ error: 'local_only' });
+    return null;
+  }
+
+  try {
+    return loadDevAuthConfig();
+  } catch (e) {
+    res.status(500).json({
+      error: 'dev_auth_not_configured',
+      message: e instanceof Error ? e.message : 'Configuration d’authentification locale invalide.',
+    });
+    return null;
+  }
 }
 
 /**
@@ -37,8 +80,64 @@ function requireAuthConfig(res: Response) {
   }
 }
 
+// GET /api/auth/dev-fixtures — liste les identités allowlistées, localement uniquement.
+authRouter.get('/dev-fixtures', (req, res) => {
+  const config = requireLocalDevAuth(req, res);
+  if (!config) return;
+  res.json({ fixtures: listDevAuthFixtures(getDb(), config) });
+});
+
+const DevAuthInputSchema = z.object({
+  fixture: z.enum(DEV_AUTH_FIXTURE_NAMES),
+});
+
+// POST /api/auth/dev-login — établit une session normale avec une fixture locale.
+authRouter.post('/dev-login', (req, res) => {
+  const config = requireLocalDevAuth(req, res);
+  if (!config) return;
+
+  const result = DevAuthInputSchema.safeParse(req.body);
+  if (!result.success) {
+    res.status(400).json({ error: result.error.flatten() });
+    return;
+  }
+
+  const fixture = result.data.fixture as DevAuthFixtureName;
+  const devSession = buildDevAuthSession(getDb(), config, fixture);
+  if (!devSession) {
+    res.status(404).json({ error: 'dev_fixture_unavailable' });
+    return;
+  }
+
+  // Même protection contre la fixation de session que pour le callback Entra.
+  req.session.regenerate((err) => {
+    if (err) {
+      res.status(500).json({ error: 'session_error' });
+      return;
+    }
+
+    req.session.user = devSession.user;
+    req.session.csrfToken = generateCsrfToken();
+    if (devSession.impersonation) {
+      req.session.impersonation = devSession.impersonation;
+    }
+
+    req.session.save((saveError) => {
+      if (saveError) {
+        res.status(500).json({ error: 'session_error' });
+        return;
+      }
+      res.status(200).json({ ok: true });
+    });
+  });
+});
+
 // GET /api/auth/login — redirige vers Microsoft Entra.
 authRouter.get('/login', async (req, res) => {
+  if (loadAuthMode() === 'dev') {
+    res.status(404).json({ error: 'entra_auth_disabled' });
+    return;
+  }
   const config = requireAuthConfig(res);
   if (!config) return;
   const provider = getEntraProvider(config);
@@ -49,6 +148,10 @@ authRouter.get('/login', async (req, res) => {
 
 // GET /api/auth/callback — retour Microsoft Entra.
 authRouter.get('/callback', async (req, res) => {
+  if (loadAuthMode() === 'dev') {
+    res.status(404).json({ error: 'entra_auth_disabled' });
+    return;
+  }
   const config = requireAuthConfig(res);
   if (!config) return;
   const provider = getEntraProvider(config);
@@ -112,6 +215,7 @@ authRouter.get('/me', (req, res) => {
     status: user.status,
     impersonation: isImpersonating ? impersonation : null,
     csrfToken: req.session.csrfToken,
+    authMode: loadAuthMode(),
   });
 });
 

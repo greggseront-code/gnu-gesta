@@ -1,10 +1,19 @@
-import type { CurrentAuthUser } from './auth.types';
+import type { CurrentAuthUser, DevAuthFixture } from './auth.types';
 import { apiFetch } from '../../lib/api-client';
 
 const API_BASE = '/api';
 
 export function loginUrl(): string {
   return `${API_BASE}/auth/login`;
+}
+
+export async function getDevAuthFixtures(): Promise<DevAuthFixture[]> {
+  const response = await apiFetch<{ fixtures: DevAuthFixture[] }>('/auth/dev-fixtures');
+  return response.fixtures;
+}
+
+export async function loginWithDevFixture(fixture: DevAuthFixture['name']): Promise<void> {
+  await apiFetch('/auth/dev-login', { method: 'POST', body: JSON.stringify({ fixture }) });
 }
 
 /** Returns null when there is no active session (401), throws on other failures. */

@@ -119,6 +119,11 @@ export function AppLayout() {
         </aside>
 
         <main className="main">
+          {user?.authMode === 'dev' && (
+            <div className="dev-auth-banner" role="status">
+              AUTH DEV — local uniquement
+            </div>
+          )}
           {isImpersonating && (
             <div className="impersonation-banner" role="status">
               Mode temporaire : vous voyez l'application comme {role === 'etudiant' ? 'un étudiant' : 'une entreprise'}.{' '}

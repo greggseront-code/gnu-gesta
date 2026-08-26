@@ -11,9 +11,14 @@
 * `GET /api/auth/login` : redirige vers Microsoft Entra (state, nonce, PKCE).
 * `GET /api/auth/callback` : retour Microsoft Entra, établit la session ou
   redirige vers `/auth-check?error=...`.
+* `GET /api/auth/dev-fixtures` : liste les fixtures de test, uniquement en
+  `AUTH_MODE=dev`, en développement et depuis une adresse loopback.
+* `POST /api/auth/dev-login` : `{ fixture }` — régénère une session Express et
+  établit une identité allowlistée (`manager`, `reader`, deux étudiants ou
+  entreprise). Un compte faux n'est jamais ajouté à `users`.
 * `GET /api/auth/me` : identité de la session courante — `name`, `email`,
   `baseRole`, `role` (effectif), `entityId` (effectif), `status`,
-  `impersonation`, `csrfToken`. `401` sans session.
+  `impersonation`, `csrfToken`, `authMode`. `401` sans session.
 * `POST /api/auth/logout` : déconnexion locale (session GNG uniquement, pas
   de déconnexion Microsoft globale). Protégé par CSRF.
 * `POST /api/auth/impersonation` : `{ kind: 'student' | 'company', entityId }`
@@ -109,6 +114,12 @@ Voir `backend/.env.example` pour la liste complète des variables et
 `npm run auth:config:check` pour valider la configuration locale sans
 afficher de valeur sensible (aussi exécuté en `ExecStartPre` du service
 systemd — voir `docs/deployment.md`).
+
+Le mode `AUTH_MODE=dev` est refusé hors de `NODE_ENV=development`, exige une
+configuration locale valide (`APP_BASE_URL`, `SESSION_SECRET`,
+`GESTA_MANAGER_EMAIL`, `HOST`) et ne sert qu'à créer des sessions de test
+normales. Le frontend Vite est lié à `127.0.0.1` et affiche un bandeau visible
+`AUTH DEV — local uniquement`. Le VPS et la production restent en mode Entra.
 
 En l'absence de configuration valide (hors `NODE_ENV=test`) :
 

@@ -22,6 +22,13 @@ npm install
 npm run dev
 ```
 
+Pour tester localement sans ouvrir Microsoft Entra, renseigner dans
+`backend/.env` `NODE_ENV=development`, `AUTH_MODE=dev`, `HOST=127.0.0.1`, une
+`SESSION_SECRET` d'au moins 16 caractères et une `APP_BASE_URL` en
+`http://localhost` ou `http://127.0.0.1`. Démarrer les deux serveurs puis ouvrir
+`http://localhost:5173/dev-login`. Le sélecteur ne fonctionne pas sur une autre
+adresse et le VPS doit conserver `AUTH_MODE=entra`.
+
 **Sur un serveur/VPS (via SSH) :** utiliser plutôt `./dev.sh` à la racine, qui
 lance backend et frontend dans deux sessions `tmux` ("backend", "frontend").
 Ces process survivent à la fermeture de la session SSH — `tmux attach -t
