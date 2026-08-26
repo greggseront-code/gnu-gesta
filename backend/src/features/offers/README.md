@@ -115,7 +115,7 @@ Points d'attention :
   technique est persisté dans `offer_attachments.storage_name`, puis résolu
   sous `backend/uploads/` par le helper de stockage.
 
-Voir aussi : `docs/data-model.md`.
+Voir aussi : `docs/current/data-model.md`.
 
 ## Permissions
 
@@ -163,7 +163,5 @@ Scénarios importants :
 
 ## Documents liés
 
-* Carte des features : `docs/features.md`
-* Modèle de données : `docs/data-model.md`
-* Spec : `docs/specs/2026-08-02-validation-offres-entreprises-contacts.md`
-* Review : `docs/reviews/2026-08-02-validation-offres-entreprises-contacts.md`
+* Carte des features : `docs/current/features.md`
+* Modèle de données : `docs/current/data-model.md`

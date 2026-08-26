@@ -238,6 +238,10 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
+    .node-row.quad {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
     .node {
       position: relative;
       border: 1px solid var(--line);
@@ -486,7 +490,8 @@
       }
 
       .node-row,
-      .node-row.triple {
+      .node-row.triple,
+      .node-row.quad {
         grid-template-columns: 1fr;
       }
 
@@ -509,9 +514,9 @@
       <div class="title-block">
         <h1>Context engineering documentaire</h1>
         <p class="subtitle">
-          Une carte des documents qui permettent de développer avec l'IA :
-          ce que l'agent doit lire, ce qu'il peut produire, ce qu'il peut
-          maintenir, et ce qui doit rester explicite pour guider son travail.
+          Une carte de routage vers le plus petit contexte utile : état et
+          contrat courant d'abord, documents spécialisés sur déclencheur,
+          historique seulement lorsqu'une tâche l'exige.
         </p>
       </div>
       <div class="controls" aria-label="Contrôles de la carte">
@@ -522,12 +527,12 @@
     </header>
 
     <section class="map-shell" aria-labelledby="map-title">
-      <h2 id="map-title">Structure en couches</h2>
-      <p class="hint">Clique sur un bloc de la carte pour déplier son contenu, ou clique sur son nom pour ouvrir le fichier.</p>
+      <h2 id="map-title">Routage minimal et cycle de vie</h2>
+      <p class="hint">Chaque ligne correspond à un déclencheur de lecture, pas à une liste de documents à charger intégralement.</p>
       <div class="legend" aria-label="Légende">
-        <span><i class="dot" aria-hidden="true"></i>Contexte à charger</span>
-        <span><i class="dot orange" aria-hidden="true"></i>Mémoire de travail</span>
-        <span><i class="dot blue" aria-hidden="true"></i>Support de cohérence</span>
+        <span><i class="dot" aria-hidden="true"></i>Vrai maintenant</span>
+        <span><i class="dot orange" aria-hidden="true"></i>Travail ou mémoire datée</span>
+        <span><i class="dot blue" aria-hidden="true"></i>Routage, opérations et modèles</span>
       </div>
       <div class="roles-legend" aria-label="Légende des apports de l'IA">
         <div class="role-item">
@@ -550,193 +555,164 @@
 
       <div class="flow" id="flow">
         <div class="lane" data-step="0">
-          <div class="lane-label">Entrée agent</div>
-          <div class="node-row single">
+          <div class="lane-label">Toujours au départ</div>
+          <div class="node-row">
             <div class="node" role="button" tabindex="0" aria-expanded="false">
-              <span class="node-title"><a class="path-link" href="../CLAUDE.md">../CLAUDE.md</a></span>
-              <div class="node-summary">Règles de travail, ordre de lecture et garde-fous.</div>
-              <div class="role-badges" aria-label="Apports de l’IA">
-                <span class="role-badge assisted">IA-assisted</span>
-              </div>
-              <div class="node-details">
-                <div class="detail-inner">
-                  <div class="detail-title">À mettre dedans</div>
-                  <ul>
-                    <li>Les documents à lire avant de modifier.</li>
-                    <li>Les règles de création de spec, review et README.</li>
-                    <li>Les limites d'action données à l'agent.</li>
-                  </ul>
-                </div>
-              </div>
+              <span class="node-title"><a class="path-link" href="../AGENT.md">../AGENT.md</a></span>
+              <div class="node-summary">Matrice « type de tâche → lectures minimales » et garde-fous.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge assisted">IA-assisted</span></div>
+              <div class="node-details"><div class="detail-inner">
+                <div class="detail-title">Rôle</div>
+                <ul>
+                  <li>Lire l'état courant, puis seulement les sources déclenchées.</li>
+                  <li>Interdire l'historique et les reviews comme prérequis par défaut.</li>
+                  <li>Définir le cycle d'écriture et les limites Git.</li>
+                </ul>
+              </div></div>
+            </div>
+            <div class="node" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./current/state.md">./current/state.md</a></span>
+              <div class="node-summary">Instantané court : état, sujet préparé, alertes opérationnelles.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge maintainable">IA-maintenable</span></div>
+              <div class="node-details"><div class="detail-inner">
+                <div class="detail-title">Rôle</div>
+                <ul>
+                  <li>Donner le point de reprise sans raconter les phases passées.</li>
+                  <li>Nommer seulement les travaux ouverts et les prochaines alertes.</li>
+                </ul>
+              </div></div>
             </div>
           </div>
         </div>
         <div class="connector" data-step="1" aria-hidden="true"></div>
 
         <div class="lane" data-step="2">
-          <div class="lane-label">Vue globale</div>
+          <div class="lane-label">Index documentaire</div>
           <div class="node-row single">
-            <div class="node" role="button" tabindex="0" aria-expanded="false">
-              <span class="node-title"><a class="path-link" href="./architecture.md">./architecture.md</a></span>
-              <div class="node-summary">Vision stable, stack, principes, arborescence et règles transversales.</div>
-              <div class="role-badges" aria-label="Apports de l’IA">
-                <span class="role-badge assisted">IA-assisted</span>
-              </div>
-              <div class="node-details">
-                <div class="detail-inner">
-                  <div class="detail-title">À mettre dedans</div>
-                  <ul>
-                    <li>Vision système, acteurs et workflows globaux.</li>
-                    <li>Stack, principes architecturaux et conventions.</li>
-                    <li>Questions ouvertes qui touchent plusieurs features.</li>
-                  </ul>
-                </div>
-              </div>
+            <div class="node support" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./README.md">./README.md</a></span>
+              <div class="node-summary">Source de vérité pour la taxonomie et le cycle de vie documentaire.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge assisted">IA-assisted</span></div>
+              <div class="node-details"><div class="detail-inner">
+                <div class="detail-title">Quand le lire</div>
+                <ul>
+                  <li>Avant de créer, déplacer ou clore un document.</li>
+                  <li>Pour choisir entre courant, décision, opération, actif et historique.</li>
+                </ul>
+              </div></div>
             </div>
           </div>
         </div>
         <div class="connector" data-step="3" aria-hidden="true"></div>
 
         <div class="lane" data-step="4">
-          <div class="lane-label">Vues transversales</div>
-          <div class="node-row">
+          <div class="lane-label">Vrai maintenant</div>
+          <div class="node-row quad">
             <div class="node" role="button" tabindex="0" aria-expanded="false">
-              <span class="node-title"><a class="path-link" href="./features.md">./features.md</a></span>
-              <div class="node-summary">Carte produit front/back, parcours, contrats et cas limites.</div>
-              <div class="role-badges" aria-label="Apports de l’IA">
-                <span class="role-badge assisted">IA-assisted</span>
-                <span class="role-badge maintainable">IA-maintenable</span>
-              </div>
-              <div class="node-details">
-                <div class="detail-inner">
-                  <div class="detail-title">À mettre dedans</div>
-                  <ul>
-                    <li>But métier et parcours utilisateur par feature.</li>
-                    <li>Contrat front/back et pages concernées.</li>
-                    <li>Cas limites utiles pour éviter les erreurs d'agent.</li>
-                  </ul>
-                </div>
-              </div>
+              <span class="node-title"><a class="path-link" href="./current/architecture.md">architecture.md</a></span>
+              <div class="node-summary">Composants et invariants transversaux.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge assisted">IA-assisted</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Déclencheur</div><ul><li>Nouvelle feature ou changement multifeature.</li></ul></div></div>
             </div>
             <div class="node" role="button" tabindex="0" aria-expanded="false">
-              <span class="node-title"><a class="path-link" href="./data-model.md">./data-model.md</a></span>
-              <div class="node-summary">Schéma SQLite, relations, contraintes et mapping feature -> tables.</div>
-              <div class="role-badges" aria-label="Apports de l’IA">
-                <span class="role-badge maintainable">IA-maintenable</span>
-              </div>
-              <div class="node-details">
-                <div class="detail-inner">
-                  <div class="detail-title">À mettre dedans</div>
-                  <ul>
-                    <li>Tables, relations et contraintes importantes.</li>
-                    <li>Mapping entre features backend et tables utilisées.</li>
-                    <li>Limites DB, migrations et questions ouvertes.</li>
-                  </ul>
-                </div>
-              </div>
+              <span class="node-title"><a class="path-link" href="./current/features.md">features.md</a></span>
+              <div class="node-summary">Carte produit et contrats front/back.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge maintainable">IA-maintenable</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Déclencheur</div><ul><li>Changement frontend ou de comportement produit ; lire la section utile.</li></ul></div></div>
+            </div>
+            <div class="node" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./current/data-model.md">data-model.md</a></span>
+              <div class="node-summary">Schéma SQLite, relations et contraintes partagées.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge maintainable">IA-maintenable</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Déclencheur</div><ul><li>Schéma, requête transverse, migration ou contrat de données.</li></ul></div></div>
+            </div>
+            <div class="node" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./current/backlog.md">backlog.md</a></span>
+              <div class="node-summary">Sujets repérés mais ni ordonnés ni promis.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge assisted">IA-assisted</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Déclencheur</div><ul><li>Arbitrage produit ou recherche d'un travail non engagé.</li></ul></div></div>
             </div>
           </div>
         </div>
         <div class="connector" data-step="5" aria-hidden="true"></div>
 
         <div class="lane" data-step="6">
-          <div class="lane-label">Contexte local</div>
-          <div class="node-row single">
+          <div class="lane-label">Contexte ciblé</div>
+          <div class="node-row">
             <div class="node" role="button" tabindex="0" aria-expanded="false">
-              <span class="node-title"><a class="path-link" href="../backend/src/features/applications/README.md">../backend/src/features/&lt;feature&gt;/README.md</a></span>
-              <div class="node-summary">Détails backend proches du code pour la feature impactée.</div>
-              <div class="role-badges" aria-label="Apports de l’IA">
-                <span class="role-badge draft">IA-draft</span>
-                <span class="role-badge maintainable">IA-maintenable</span>
-              </div>
-              <div class="node-details">
-                <div class="detail-inner">
-                  <div class="detail-title">À mettre dedans</div>
-                  <ul>
-                    <li>Endpoints, modèle local et règles serveur.</li>
-                    <li>Accès données, permissions et scénarios de tests.</li>
-                    <li>Contexte à lire juste avant de toucher une feature.</li>
-                  </ul>
-                </div>
-              </div>
+              <span class="node-title"><a class="path-link" href="../backend/src/features/applications/README.md">backend/.../&lt;feature&gt;/README.md</a></span>
+              <div class="node-summary">Contrat backend local, au plus près du code touché.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge draft">IA-draft</span><span class="role-badge maintainable">IA-maintenable</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Contenu</div><ul><li>Endpoints, règles, accès données, permissions et tests de la feature.</li><li>Pas de liste exhaustive d'artefacts historiques.</li></ul></div></div>
+            </div>
+            <div class="node support" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./decisions/README.md">./decisions/</a></span>
+              <div class="node-summary">ADR courtes pour les choix durablement contraignants.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge assisted">IA-assisted</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Déclencheur</div><ul><li>Avant de contredire un choix qui traverse plusieurs features.</li><li>Aucune ADR séparée n'est nécessaire actuellement.</li></ul></div></div>
             </div>
           </div>
         </div>
         <div class="connector" data-step="7" aria-hidden="true"></div>
 
         <div class="lane" data-step="8">
-          <div class="lane-label">Avant / pendant / après</div>
-          <div class="node-row triple">
-            <div class="node memory" role="button" tabindex="0" aria-expanded="false">
-              <span class="node-title"><a class="path-link" href="./specs/">./specs/</a></span>
-              <div class="node-summary">Intention et critères d'acceptation avant changement.</div>
-              <div class="role-badges" aria-label="Apports de l’IA">
-                <span class="role-badge assisted">IA-assisted</span>
-              </div>
-              <div class="node-details">
-                <div class="detail-inner">
-                  <div class="detail-title">À mettre dedans</div>
-                  <ul>
-                    <li>Contexte, objectif, périmètre et comportement attendu.</li>
-                    <li>Critères d'acceptation et impacts techniques connus.</li>
-                  </ul>
-                </div>
-              </div>
+          <div class="lane-label">Selon la tâche</div>
+          <div class="node-row">
+            <div class="node support" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./operations/deployment.md">./operations/</a></span>
+              <div class="node-summary">Déploiement et préparation au trafic réel.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge maintainable">IA-maintenable</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Déclencheur</div><ul><li>Déploiement, environnement, Entra, Nginx, HTTPS ou production readiness.</li></ul></div></div>
             </div>
             <div class="node memory" role="button" tabindex="0" aria-expanded="false">
-              <span class="node-title"><a class="path-link" href="./plans/">./plans/</a></span>
-              <div class="node-summary">Checklist d'exécution pour les travaux significatifs.</div>
-              <div class="role-badges" aria-label="Apports de l’IA">
-                <span class="role-badge draft">IA-draft</span>
-              </div>
-              <div class="node-details">
-                <div class="detail-inner">
-                  <div class="detail-title">À mettre dedans</div>
-                  <ul>
-                    <li>Décision d'approche et tâches ordonnées.</li>
-                    <li>Vérifications à faire avant de terminer.</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <div class="node memory" role="button" tabindex="0" aria-expanded="false">
-              <span class="node-title"><a class="path-link" href="./reviews/">./reviews/</a></span>
-              <div class="node-summary">Bilan daté, écarts, vérifications, risques et reste à faire.</div>
-              <div class="role-badges" aria-label="Apports de l’IA">
-                <span class="role-badge produced">IA-produced</span>
-              </div>
-              <div class="node-details">
-                <div class="detail-inner">
-                  <div class="detail-title">À mettre dedans</div>
-                  <ul>
-                    <li>Travail réalisé, fichiers impactés et écarts.</li>
-                    <li>Tests, risques, limites et incertitudes restantes.</li>
-                  </ul>
-                </div>
-              </div>
+              <span class="node-title"><a class="path-link" href="./work/active/README.md">./work/active/</a></span>
+              <div class="node-summary">Un dossier par sujet ouvert avec son contexte minimal.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge assisted">IA-assisted</span><span class="role-badge draft">IA-draft</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Cycle actif</div><ul><li><code>README.md</code> obligatoire ; <code>analysis.md</code>, <code>spec.md</code> et <code>plan.md</code> seulement si utiles.</li><li>Le README justifie toute lecture historique additionnelle.</li></ul></div></div>
             </div>
           </div>
         </div>
         <div class="connector" data-step="9" aria-hidden="true"></div>
 
         <div class="lane" data-step="10">
+          <div class="lane-label">Historique déclenché</div>
+          <div class="node-row triple">
+            <div class="node memory" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./history/phases/README.md">history/phases/</a></span>
+              <div class="node-summary">Specs, plans et propositions clos.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge produced">IA-produced</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Règle</div><ul><li>Lecture seule ; suffixes <code>-spec</code>, <code>-plan</code> et <code>-proposal</code>.</li></ul></div></div>
+            </div>
+            <div class="node memory" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./history/reviews/README.md">history/reviews/</a></span>
+              <div class="node-summary">Constats post-implémentation datés.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge produced">IA-produced</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Règle</div><ul><li>Jamais une lecture prérequise ; les contraintes actives remontent ailleurs.</li></ul></div></div>
+            </div>
+            <div class="node memory" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./history/analyses/README.md">history/analyses/</a></span>
+              <div class="node-summary">Études qui ne gouvernent plus un sujet actif.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge assisted">IA-assisted</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Déclencheur</div><ul><li>Retrouver un raisonnement passé insuffisamment couvert par les sources courantes.</li></ul></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="connector" data-step="11" aria-hidden="true"></div>
+
+        <div class="lane" data-step="12">
           <div class="lane-label">Formes standard</div>
-          <div class="node-row single">
+          <div class="node-row">
             <div class="node support" role="button" tabindex="0" aria-expanded="false">
               <span class="node-title"><a class="path-link" href="./templates/README.md">./templates/README.md</a></span>
-              <div class="node-summary">Modèles pour garder les specs, reviews et README cohérents.</div>
-              <div class="role-badges" aria-label="Apports de l’IA">
-                <span class="role-badge assisted">IA-assisted</span>
-              </div>
-              <div class="node-details">
-                <div class="detail-inner">
-                  <div class="detail-title">À mettre dedans</div>
-                  <ul>
-                    <li>Templates de spec, review, data model et feature map.</li>
-                    <li>Template de README backend de feature.</li>
-                  </ul>
-                </div>
-              </div>
+              <div class="node-summary">Modèles de spec, plan, review et sources courantes.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge assisted">IA-assisted</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Règle</div><ul><li>Le modèle donne une forme, jamais l'autorisation de dupliquer une source de vérité.</li></ul></div></div>
+            </div>
+            <div class="node support" role="button" tabindex="0" aria-expanded="false">
+              <span class="node-title"><a class="path-link" href="./prompts/create-plan-from-spec-short.md">./prompts/</a></span>
+              <div class="node-summary">Prompts courts alignés sur le dossier actif du sujet.</div>
+              <div class="role-badges" aria-label="Apports de l’IA"><span class="role-badge draft">IA-draft</span></div>
+              <div class="node-details"><div class="detail-inner"><div class="detail-title">Règle</div><ul><li>Créer <code>plan.md</code> sous <code>work/active/&lt;sujet&gt;/</code> et n'ouvrir les documents transversaux que sur déclencheur.</li></ul></div></div>
             </div>
           </div>
         </div>

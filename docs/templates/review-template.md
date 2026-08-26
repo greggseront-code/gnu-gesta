@@ -2,11 +2,14 @@
 
 Date : YYYY-MM-DD
 
+Statut : close. Une review n'est jamais une lecture prérequise et n'est pas
+réécrite pour coller à un état plus récent.
+
 ## Documents liés
 
 * Spec :
 * README de feature :
-* Architecture : `docs/architecture.md`
+* Architecture : `docs/current/architecture.md`
 
 ## Objectif
 
@@ -88,3 +91,13 @@ Non testé ou à vérifier :
 ## Incertitudes
 
 * ...
+
+## Ce qui remonte hors de cette review
+
+Nommer chaque information encore vraie déplacée vers sa source courante, ou
+écrire « rien à reporter ».
+
+* Document courant ou README mis à jour :
+* ADR créée ou modifiée :
+* Entrée de `docs/current/backlog.md` :
+* Artefacts déplacés vers `docs/history/` :

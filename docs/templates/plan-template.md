@@ -4,19 +4,25 @@ Date : YYYY-MM-DD
 
 Statut : brouillon | en cours | terminé | abandonné
 
+Emplacement : `docs/work/active/<sujet>/plan.md` tant que le sujet est ouvert ;
+`docs/history/phases/` à la clôture.
+
 ## Contexte
 
 Pourquoi ce plan existe et quel problème il doit résoudre, en quelques lignes.
 Ne pas recopier les documents de référence : les lier seulement.
 
-Sources à relire avant exécution :
+Sources minimales à relire avant exécution :
 
 * Spec :
-* Architecture : `docs/architecture.md`
-* Carte des features : `docs/features.md`
-* Modèle de données : `docs/data-model.md`
-* README de feature :
-* Review précédente :
+* README des features touchées :
+
+Sur déclencheur seulement :
+
+* changement transversal → `docs/current/architecture.md`,
+  `docs/current/data-model.md` et les ADR concernées ;
+* arbitrage produit → `docs/current/backlog.md` ;
+* travail opérationnel → `docs/operations/`.
 
 ## Objectif
 

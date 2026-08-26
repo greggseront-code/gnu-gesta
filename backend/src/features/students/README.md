@@ -47,7 +47,7 @@ Points d'attention :
 * L'import utilise une transaction et retourne le nombre de lignes reçues.
 * `ON CONFLICT(email)` met à jour les champs d'un étudiant existant.
 
-Voir aussi : `docs/data-model.md`.
+Voir aussi : `docs/current/data-model.md`.
 
 ## Permissions
 
@@ -81,5 +81,5 @@ Scénarios importants :
 
 ## Documents liés
 
-* Carte des features : `docs/features.md`
-* Modèle de données : `docs/data-model.md`
+* Carte des features : `docs/current/features.md`
+* Modèle de données : `docs/current/data-model.md`

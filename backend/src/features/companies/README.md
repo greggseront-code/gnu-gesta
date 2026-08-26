@@ -116,13 +116,13 @@ Points d'attention :
 * Les index uniques normalisés (`idx_company_contacts_email_norm`,
   `idx_companies_name_address_norm`) sont créés dans `db.migrate.ts`, après
   un audit de conflits pré-migration qui bloque le démarrage sans supprimer
-  ni fusionner de données (voir `docs/data-model.md`).
+  ni fusionner de données (voir `docs/current/data-model.md`).
 * La suppression d'une entreprise ou d'un contact vérifie l'absence de
   référence en base **avant** le `DELETE` : la clé étrangère
   `offer_contacts.contact_id ON DELETE CASCADE` ne suffit pas, elle
   supprimerait silencieusement un lien non prioritaire.
 
-Voir aussi : `docs/data-model.md`.
+Voir aussi : `docs/current/data-model.md`.
 
 ## Permissions
 
@@ -164,7 +164,5 @@ Scénarios importants :
 
 ## Documents liés
 
-* Carte des features : `docs/features.md`
-* Modèle de données : `docs/data-model.md`
-* Spec : `docs/specs/2026-08-02-validation-offres-entreprises-contacts.md`
-* Review : `docs/reviews/2026-08-02-validation-offres-entreprises-contacts.md`
+* Carte des features : `docs/current/features.md`
+* Modèle de données : `docs/current/data-model.md`

@@ -1,44 +1,20 @@
-# Templates de documentation
+# Modèles d'écriture
 
-La structure documentaire cible actuelle est volontairement légère.
+La structure, les statuts et le cycle de vie sont décrits dans
+`docs/README.md`. Ce document indique seulement quel modèle utiliser.
 
-## À utiliser maintenant
+| Modèle | Pour |
+| --- | --- |
+| `spec-template.md` | `docs/work/active/<sujet>/spec.md` |
+| `plan-template.md` | `docs/work/active/<sujet>/plan.md` |
+| `review-template.md` | `docs/history/reviews/YYYY-MM-DD-sujet.md` |
+| `features-map-template.md` | `docs/current/features.md` |
+| `data-model-template.md` | `docs/current/data-model.md` |
+| `backend-feature-readme-template.md` | `backend/src/features/<feature>/README.md` |
 
-### Plan d'exécution
+Le `README.md` d'un sujet actif reste libre et court : contexte minimal,
+statut et lectures additionnelles justifiées.
 
-Utiliser `docs/templates/plan-template.md` pour créer ou maintenir :
-
-* `docs/plans/YYYY-MM-DD-nom-du-plan.md`
-
-Ce document structure un plan d'exécution sans répéter la documentation de
-contexte : objectif, périmètre, impacts prévus, décisions propres au plan,
-tâches cochables, vérifications, observables humains et self-review.
-
-### Carte des features
-
-Utiliser `docs/templates/features-map-template.md` pour créer ou maintenir :
-
-* `docs/features.md`
-
-Ce document centralise la vue produit des features et les liens utiles vers le
-frontend et le backend.
-
-### Modèle de données
-
-Utiliser `docs/templates/data-model-template.md` pour créer ou maintenir :
-
-* `docs/data-model.md`
-
-Ce document décrit la base de données comme ressource transversale du backend.
-
-### README backend de feature
-
-Utiliser `docs/templates/backend-feature-readme-template.md` pour créer ou
-maintenir :
-
-* `backend/src/features/<feature>/README.md`
-
-Ce document décrit uniquement l'implémentation backend locale : endpoints,
-modèle, règles serveur, accès données, permissions et tests backend.
-
-Les pages et briques frontend sont documentées dans `docs/features.md`.
+Trois règles priment sur les modèles : une seule source de vérité ; un document
+daté ne se réécrit pas après clôture ; ce qui reste vrai remonte dans un
+document courant, une ADR ou un README local.

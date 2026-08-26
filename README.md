@@ -2,6 +2,9 @@
 
 Application web de gestion des stages.
 
+Documentation : `docs/README.md`. Les contributeurs et agents commencent par
+`AGENT.md`, qui route vers le plus petit contexte utile.
+
 ## Prérequis
 
 - Node.js 20+

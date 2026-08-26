@@ -1,9 +1,12 @@
 # Créer un plan depuis une spec - version courte
 
 ```text
-À partir de cette spec, crée un plan d’exécution dans `docs/plans/` en utilisant `docs/templates/plan-template.md`.
+À partir de cette spec, crée `plan.md` dans son dossier
+`docs/work/active/<sujet>/` en utilisant `docs/templates/plan-template.md`.
 
-Le plan doit s’appuyer sur la documentation existante sans la recopier. Lis les documents de contexte nécessaires (`docs/architecture.md`, `docs/features.md`, `docs/data-model.md`, README de features concernés), puis produis un plan concret avec impacts prévus, décisions propres au plan, tâches cochables, vérifications, observables humains, points d’attention et self-review.
+Le plan doit s'appuyer sur la documentation existante sans la recopier. Lis le
+README du sujet et des features concernées ; n'ouvre les documents transversaux
+que sur déclencheur. Produis des tâches concrètes, vérifiables et ordonnées.
 
 Ne modifie pas le code applicatif.
 ```

@@ -88,7 +88,7 @@
   (`rolling: true`), `HttpOnly`, `SameSite=Lax`, `Secure` en
   production/staging (`trust proxy` activé, voir `app.ts`).
 
-Voir aussi : `docs/data-model.md`.
+Voir aussi : `docs/current/data-model.md`.
 
 ## Permissions
 
@@ -113,7 +113,7 @@ Voir aussi : `docs/data-model.md`.
 Voir `backend/.env.example` pour la liste complète des variables et
 `npm run auth:config:check` pour valider la configuration locale sans
 afficher de valeur sensible (aussi exécuté en `ExecStartPre` du service
-systemd — voir `docs/deployment.md`).
+systemd — voir `docs/operations/deployment.md`).
 
 Le mode `AUTH_MODE=dev` est refusé hors de `NODE_ENV=development`, exige une
 configuration locale valide (`APP_BASE_URL`, `SESSION_SECRET`,
@@ -158,11 +158,7 @@ la suite automatisée.
 
 ## Documents liés
 
-* Spec : `docs/specs/2026-07-31-authentification-microsoft-entra-v1.md`
-* Plan : `docs/plans/2026-07-31-authentification-microsoft-entra-v1.md`
-* Review pilote (jalon 1) : `docs/reviews/2026-07-31-authentification-microsoft-entra-pilot.md`
-* Review cible (jalons 2-7) : `docs/reviews/2026-07-31-authentification-microsoft-entra-v1.md`
-* Carte des features : `docs/features.md`
-* Modèle de données : `docs/data-model.md`
-* Déploiement / secrets : `docs/deployment.md`
-* Points d'attention avant mise en production réelle : `docs/production-readiness.md`
+* Carte des features : `docs/current/features.md`
+* Modèle de données : `docs/current/data-model.md`
+* Déploiement / secrets : `docs/operations/deployment.md`
+* Points d'attention avant mise en production réelle : `docs/operations/production-readiness.md`

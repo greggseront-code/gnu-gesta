@@ -24,7 +24,7 @@ Tables, requêtes SQL, transactions ou contraintes de base utilisées.
 
 * ...
 
-Voir aussi : `docs/data-model.md`.
+Voir aussi : `docs/current/data-model.md`.
 
 ## Permissions
 
@@ -44,5 +44,5 @@ Scénarios importants :
 
 ## Documents liés
 
-* Carte des features : `docs/features.md`
-* Modèle de données : `docs/data-model.md`
+* Carte des features : `docs/current/features.md`
+* Modèle de données : `docs/current/data-model.md`

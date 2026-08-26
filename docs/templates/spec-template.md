@@ -1,5 +1,12 @@
 # Titre de la spec
 
+Date : YYYY-MM-DD
+
+Statut : brouillon | validée | livrée | abandonnée
+
+Emplacement : `docs/work/active/<sujet>/spec.md` tant que le sujet est ouvert ;
+`docs/history/phases/` à la clôture.
+
 ## Contexte
 
 Pourquoi ce changement est demandé.
@@ -64,10 +71,15 @@ Tests à prévoir :
 ## Documents liés
 
 * PRD :
-* Architecture : `docs/architecture.md`
+* Architecture : `docs/current/architecture.md`
 * README de feature :
 * Review :
 
 ## Incertitudes
 
 * ...
+
+## Non-duplication
+
+Cette spec ne reformule aucun fait déjà écrit dans `docs/current/`, une ADR ou
+un README de feature. Lister les renvois utiles plutôt que les recopier.

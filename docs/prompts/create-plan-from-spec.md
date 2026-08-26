@@ -1,7 +1,8 @@
 # Créer un plan depuis une spec
 
 ```text
-À partir de la spec fournie, crée un plan d’exécution dans `docs/plans/YYYY-MM-DD-nom-du-plan.md`.
+À partir de la spec fournie, crée ou utilise le dossier
+`docs/work/active/<sujet>/`, puis écris son `plan.md`.
 
 Utilise le template `docs/templates/plan-template.md`.
 
@@ -16,12 +17,10 @@ Contraintes :
 
 Avant d’écrire le plan :
 1. Lis la spec.
-2. Lis les documents de contexte nécessaires, notamment :
-   - `docs/architecture.md`
-   - `docs/features.md`
-   - `docs/data-model.md`
-   - les README de feature concernés si nécessaire
-3. Identifie les impacts prévus :
+2. Lis le `README.md` du sujet et les README de feature concernés.
+3. N'ajoute `docs/current/architecture.md`, `docs/current/features.md` ou
+   `docs/current/data-model.md` que si l'impact correspondant existe.
+4. Identifie les impacts prévus :
    - Backend
    - Frontend
    - Données
@@ -29,7 +28,7 @@ Avant d’écrire le plan :
    - Tests
 
 Ensuite :
-1. Crée le fichier de plan dans `docs/plans/`.
+1. Crée le fichier `plan.md` dans le dossier actif.
 2. Structure les tâches avec des checkboxes.
 3. Ajoute les commandes de vérification pertinentes.
 4. Ajoute les observables humains attendus.
