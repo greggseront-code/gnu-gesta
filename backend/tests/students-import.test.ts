@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import type { Database } from 'better-sqlite3';
-import { app } from '../src/app';
 import { createTestDb, setDb } from '../src/db/db.connection';
 import { loginAsGestionnaire, loginAsLecteur, loginAsEtudiant } from './helpers/authenticated-agent';
+import { testServer } from './helpers/test-server';
 
 const alice = {
   matricule: '202502681',
@@ -32,7 +32,7 @@ describe('students import', () => {
   afterEach(() => db.close());
 
   it('GET /api/students exige une session gestionnaire', async () => {
-    const anon = await request(app).get('/api/students');
+    const anon = await request(testServer).get('/api/students');
     expect(anon.status).toBe(401);
 
     const { agent } = await loginAsGestionnaire();

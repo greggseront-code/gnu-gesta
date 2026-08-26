@@ -1,7 +1,7 @@
 import request from 'supertest';
-import { app } from '../src/app';
 import { createTestDb, setDb } from '../src/db/db.connection';
 import type { Database } from 'better-sqlite3';
+import { testServer } from './helpers/test-server';
 import {
   loginAsGestionnaire,
   loginAsLecteur,
@@ -198,7 +198,7 @@ test('GET /api/companies?duplicate_risk=true retourne les entreprises à risque 
 });
 
 test('GET /api/companies anonyme reçoit 401', async () => {
-  const res = await request(app).get('/api/companies');
+  const res = await request(testServer).get('/api/companies');
   expect(res.status).toBe(401);
 });
 
@@ -430,7 +430,7 @@ describe('modération gestionnaire des entreprises et contacts', () => {
     const alice = await loginAsEtudiant('alice@student.vinci.be');
     expect((await alice.agent.get('/api/companies/pending')).status).toBe(403);
 
-    expect((await request(app).get('/api/companies/pending')).status).toBe(401);
+    expect((await request(testServer).get('/api/companies/pending')).status).toBe(401);
   });
 
   test('GET /api/companies/pending liste les entreprises et contacts en attente avec créateur et doublons', async () => {

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import type { Database } from 'better-sqlite3';
-import { app } from '../src/app';
 import { createTestDb, setDb } from '../src/db/db.connection';
 import { insertCompany, insertContact } from '../src/features/companies/companies.queries';
 import { loginAsGestionnaire, loginAsEtudiant, loginAsEntreprise, type AuthenticatedAgent } from './helpers/authenticated-agent';
+import { testServer } from './helpers/test-server';
 
 function insertStudent(db: Database, email: string, firstName = 'Etu', lastName = 'Diant') {
   db.prepare('INSERT INTO students (first_name, last_name, email) VALUES (?, ?, ?)').run(firstName, lastName, email);
@@ -451,7 +451,7 @@ describe('offers backend', () => {
   });
 
   it('GET /api/offers anonyme reçoit 401', async () => {
-    const res = await request(app).get('/api/offers');
+    const res = await request(testServer).get('/api/offers');
     expect(res.status).toBe(401);
   });
 

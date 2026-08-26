@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import type { Database } from 'better-sqlite3';
-import { app } from '../src/app';
 import { createTestDb, setDb } from '../src/db/db.connection';
 import { insertCompany, insertContact } from '../src/features/companies/companies.queries';
 import { loginAsGestionnaire, loginAsLecteur, loginAsEtudiant, loginAsEntreprise, type AuthenticatedAgent } from './helpers/authenticated-agent';
+import { testServer } from './helpers/test-server';
 
 const validContact = { first_name: 'Jean', last_name: 'Dupont', email: 'j@d.com', roles: ['maitre_de_stage'] };
 // Nom distinct des entreprises créées par le beforeEach ('Acme Corp' / 'Other
@@ -35,7 +35,7 @@ describe('access control — companies routes', () => {
   // ─── GET / ───────────────────────────────────────────────────────
 
   it('GET /api/companies anonyme reçoit 401', async () => {
-    const res = await request(app).get('/api/companies');
+    const res = await request(testServer).get('/api/companies');
     expect(res.status).toBe(401);
   });
 
@@ -53,7 +53,7 @@ describe('access control — companies routes', () => {
   // ─── GET /:id ────────────────────────────────────────────────────
 
   it('unauthenticated request receives 401 on GET /api/companies/:id', async () => {
-    const res = await request(app).get(`/api/companies/${companyId}`);
+    const res = await request(testServer).get(`/api/companies/${companyId}`);
     expect(res.status).toBe(401);
   });
 
@@ -84,7 +84,7 @@ describe('access control — companies routes', () => {
   });
 
   it('unauthenticated receives 401 on POST /api/companies', async () => {
-    const res = await request(app).post('/api/companies').send(validCompanyBody);
+    const res = await request(testServer).post('/api/companies').send(validCompanyBody);
     expect(res.status).toBe(401);
   });
 
@@ -256,7 +256,7 @@ describe('access control — offers routes', () => {
   it('GET /api/offers/:id/dependencies est réservé au gestionnaire', async () => {
     const lecteur = await loginAsLecteur();
     expect((await lecteur.agent.get(`/api/offers/${offerId}/dependencies`)).status).toBe(403);
-    expect((await request(app).get(`/api/offers/${offerId}/dependencies`)).status).toBe(401);
+    expect((await request(testServer).get(`/api/offers/${offerId}/dependencies`)).status).toBe(401);
     expect((await manager.agent.get(`/api/offers/${offerId}/dependencies`)).status).toBe(200);
   });
 });
@@ -344,28 +344,30 @@ describe('access control — routes de modération gestionnaire (401/403)', () =
 
   afterEach(() => db.close());
 
-  const moderationRoutes: { method: 'get' | 'post' | 'patch' | 'delete'; path: () => string }[] = [
-    { method: 'get', path: () => '/api/companies/pending' },
-    { method: 'post', path: () => `/api/companies/${companyId}/validate` },
-    { method: 'delete', path: () => `/api/companies/${companyId}` },
-    { method: 'post', path: () => `/api/companies/contacts/${contactId}/validate` },
-    { method: 'patch', path: () => `/api/companies/contacts/${contactId}` },
-    { method: 'delete', path: () => `/api/companies/contacts/${contactId}` },
+  // `label` decrit la route dans le titre du test : `path()` n'est resolu qu'a
+  // l'execution (companyId/contactId sont encore undefined a la collecte).
+  const moderationRoutes: { method: 'get' | 'post' | 'patch' | 'delete'; label: string; path: () => string }[] = [
+    { method: 'get', label: '/api/companies/pending', path: () => '/api/companies/pending' },
+    { method: 'post', label: '/api/companies/:id/validate', path: () => `/api/companies/${companyId}/validate` },
+    { method: 'delete', label: '/api/companies/:id', path: () => `/api/companies/${companyId}` },
+    { method: 'post', label: '/api/companies/contacts/:id/validate', path: () => `/api/companies/contacts/${contactId}/validate` },
+    { method: 'patch', label: '/api/companies/contacts/:id', path: () => `/api/companies/contacts/${contactId}` },
+    { method: 'delete', label: '/api/companies/contacts/:id', path: () => `/api/companies/contacts/${contactId}` },
   ];
 
-  for (const { method, path } of moderationRoutes) {
-    it(`${method.toUpperCase()} ${path()} anonyme reçoit 401`, async () => {
-      const res = await request(app)[method](path());
+  for (const { method, label, path } of moderationRoutes) {
+    it(`${method.toUpperCase()} ${label} anonyme reçoit 401`, async () => {
+      const res = await request(testServer)[method](path());
       expect(res.status).toBe(401);
     });
 
-    it(`${method.toUpperCase()} ${path()} lecteur reçoit 403`, async () => {
+    it(`${method.toUpperCase()} ${label} lecteur reçoit 403`, async () => {
       const lecteur = await loginAsLecteur();
       const res = lecteur.agent[method](path()).set('x-csrf-token', lecteur.csrfToken);
       expect((await res).status).toBe(403);
     });
 
-    it(`${method.toUpperCase()} ${path()} étudiant reçoit 403`, async () => {
+    it(`${method.toUpperCase()} ${label} étudiant reçoit 403`, async () => {
       db.prepare('INSERT INTO students (first_name, last_name, email) VALUES (?,?,?)').run('E', 'T', 'moderation-check@student.vinci.be');
       const etudiant = await loginAsEtudiant('moderation-check@student.vinci.be');
       const res = etudiant.agent[method](path()).set('x-csrf-token', etudiant.csrfToken);
@@ -381,7 +383,7 @@ describe('access control — routes de modération gestionnaire (401/403)', () =
     const offerId = offerRes.body.id;
     const assignment = { company_id: companyId, priority_contact_id: contactId, contact_ids: [contactId] };
 
-    const anon = await request(app).patch(`/api/offers/${offerId}/assignment`).send(assignment);
+    const anon = await request(testServer).patch(`/api/offers/${offerId}/assignment`).send(assignment);
     expect(anon.status).toBe(401);
 
     db.prepare('INSERT INTO students (first_name, last_name, email) VALUES (?,?,?)').run('E', 'T', 'assignment-check@student.vinci.be');

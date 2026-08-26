@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import type { Database } from 'better-sqlite3';
-import { app } from '../src/app';
 import { createTestDb, setDb } from '../src/db/db.connection';
 import { insertCompany } from '../src/features/companies/companies.queries';
 import { setEntraProvider } from '../src/features/auth/entra.client';
 import type { EntraAuthProvider, AuthCodeUrlRequest, TokenExchangeRequest } from '../src/features/auth/entra.client';
 import type { AcquiredEntraToken, EntraProfile } from '../src/features/auth/auth.types';
+import { testServer } from './helpers/test-server';
 
 const TENANT_ID = 'test-tenant-id'; // matches TEST_CONFIG in auth.config.ts under NODE_ENV=test
 
@@ -30,7 +30,7 @@ function extractState(location: string): string {
 
 async function loginAs(profile: EntraProfile) {
   setEntraProvider(new FakeEntraProvider(profile));
-  const agent = request.agent(app);
+  const agent = request.agent(testServer);
   const loginRes = await agent.get('/api/auth/login');
   const state = extractState(loginRes.headers.location as string);
   await agent.get(`/api/auth/callback?code=valid-code&state=${state}`);

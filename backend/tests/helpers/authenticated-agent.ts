@@ -3,6 +3,7 @@ import { app } from '../../src/app';
 import { setEntraProvider } from '../../src/features/auth/entra.client';
 import type { EntraAuthProvider, AuthCodeUrlRequest, TokenExchangeRequest } from '../../src/features/auth/entra.client';
 import type { AcquiredEntraToken, EntraProfile } from '../../src/features/auth/auth.types';
+import { testServer } from './test-server';
 
 const TENANT_ID = 'test-tenant-id'; // matches TEST_CONFIG in auth.config.ts under NODE_ENV=test
 
@@ -39,7 +40,7 @@ export interface AuthenticatedAgent {
  */
 async function loginWithProfile(profile: EntraProfile): Promise<AuthenticatedAgent> {
   setEntraProvider(new FakeEntraProvider(profile));
-  const agent = request.agent(app);
+  const agent = request.agent(testServer);
   const loginRes = await agent.get('/api/auth/login');
   const state = new URL(loginRes.headers.location as string).searchParams.get('state') ?? '';
   await agent.get(`/api/auth/callback?code=valid-code&state=${state}`);

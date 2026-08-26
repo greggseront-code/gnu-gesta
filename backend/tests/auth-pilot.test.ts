@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import type { Database } from 'better-sqlite3';
-import { app } from '../src/app';
 import { createTestDb, setDb } from '../src/db/db.connection';
 import { setEntraProvider } from '../src/features/auth/entra.client';
 import type { EntraAuthProvider, AuthCodeUrlRequest, TokenExchangeRequest } from '../src/features/auth/entra.client';
 import type { AcquiredEntraToken, EntraProfile } from '../src/features/auth/auth.types';
+import { testServer } from './helpers/test-server';
 
 const REAL_TENANT_ID = 'test-tenant-id'; // matches TEST_CONFIG in auth.config.ts under NODE_ENV=test
 const MANAGER_PROFILE: EntraProfile = {
@@ -65,12 +65,12 @@ describe('auth — connexion Microsoft Entra', () => {
   afterEach(() => db.close());
 
   it('GET /api/auth/me returns 401 before login', async () => {
-    const res = await request(app).get('/api/auth/me');
+    const res = await request(testServer).get('/api/auth/me');
     expect(res.status).toBe(401);
   });
 
   it('full flow: login then callback establishes a manager session', async () => {
-    const agent = request.agent(app);
+    const agent = request.agent(testServer);
 
     const loginRes = await agent.get('/api/auth/login');
     expect(loginRes.status).toBe(302);
@@ -96,7 +96,7 @@ describe('auth — connexion Microsoft Entra', () => {
   });
 
   it('rejects a callback with a mismatched state', async () => {
-    const agent = request.agent(app);
+    const agent = request.agent(testServer);
     await agent.get('/api/auth/login');
 
     const callbackRes = await agent.get('/api/auth/callback?code=valid-code&state=not-the-real-state');
@@ -108,14 +108,14 @@ describe('auth — connexion Microsoft Entra', () => {
   });
 
   it('rejects a callback without a prior login (no pending auth)', async () => {
-    const agent = request.agent(app);
+    const agent = request.agent(testServer);
     const callbackRes = await agent.get('/api/auth/callback?code=valid-code&state=anything');
     expect(callbackRes.status).toBe(302);
     expect(callbackRes.headers.location).toMatch(/error=missing_pending_auth/);
   });
 
   it('rejects a callback carrying an Entra error parameter', async () => {
-    const agent = request.agent(app);
+    const agent = request.agent(testServer);
     const loginRes = await agent.get('/api/auth/login');
     const state = extractState(loginRes.headers.location as string);
 
@@ -126,7 +126,7 @@ describe('auth — connexion Microsoft Entra', () => {
 
   it('rejects a token from another tenant', async () => {
     setEntraProvider(new FakeEntraProvider('some-other-tenant', MANAGER_PROFILE));
-    const agent = request.agent(app);
+    const agent = request.agent(testServer);
     const loginRes = await agent.get('/api/auth/login');
     const state = extractState(loginRes.headers.location as string);
 
@@ -140,7 +140,7 @@ describe('auth — connexion Microsoft Entra', () => {
 
   it('authenticates a non-manager, non-student account of the tenant as lecteur', async () => {
     setEntraProvider(new FakeEntraProvider(REAL_TENANT_ID, OTHER_PROFILE));
-    const agent = request.agent(app);
+    const agent = request.agent(testServer);
     const loginRes = await agent.get('/api/auth/login');
     const state = extractState(loginRes.headers.location as string);
 
@@ -161,7 +161,7 @@ describe('auth — connexion Microsoft Entra', () => {
   });
 
   it('logout clears the session', async () => {
-    const agent = request.agent(app);
+    const agent = request.agent(testServer);
     const loginRes = await agent.get('/api/auth/login');
     const state = extractState(loginRes.headers.location as string);
     await agent.get(`/api/auth/callback?code=valid-code&state=${state}`);
@@ -181,7 +181,7 @@ describe('auth — connexion Microsoft Entra', () => {
   it('clears the MSAL token cache after reading the profile, on success and on rejection', async () => {
     const managerProvider = new FakeEntraProvider(REAL_TENANT_ID, MANAGER_PROFILE);
     setEntraProvider(managerProvider);
-    const agent = request.agent(app);
+    const agent = request.agent(testServer);
     const loginRes = await agent.get('/api/auth/login');
     const state = extractState(loginRes.headers.location as string);
     await agent.get(`/api/auth/callback?code=valid-code&state=${state}`);
@@ -189,7 +189,7 @@ describe('auth — connexion Microsoft Entra', () => {
 
     const wrongTenantProvider = new FakeEntraProvider('some-other-tenant', MANAGER_PROFILE);
     setEntraProvider(wrongTenantProvider);
-    const agent2 = request.agent(app);
+    const agent2 = request.agent(testServer);
     const loginRes2 = await agent2.get('/api/auth/login');
     const state2 = extractState(loginRes2.headers.location as string);
     await agent2.get(`/api/auth/callback?code=valid-code&state=${state2}`);
