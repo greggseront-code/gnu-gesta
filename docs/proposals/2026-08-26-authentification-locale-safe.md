@@ -89,3 +89,78 @@ Ce mode simule l’identité et les permissions applicatives, mais ne teste pas
 OAuth, le tenant Entra, PKCE ni la configuration de production. Ces éléments
 restent validés par les tests d’authentification existants et par le test réel
 sur le VPS.
+
+## Procédure de test avec le navigateur intégré
+
+### Démarrer l'application
+
+Depuis la racine du dépôt, ouvrir deux terminaux.
+
+Dans le premier :
+
+```bash
+cd backend
+npm run dev
+```
+
+Dans le second :
+
+```bash
+cd frontend
+npm run dev
+```
+
+Vérifier que le backend écoute sur le port `3000` et que Vite affiche l'URL
+locale du frontend, généralement `http://127.0.0.1:5173/`.
+
+### Parcours dans le navigateur
+
+1. Ouvrir un nouvel onglet du navigateur intégré sur
+   [http://127.0.0.1:5173/dev-login](http://127.0.0.1:5173/dev-login).
+2. Attendre l'affichage du sélecteur de fixtures.
+3. Choisir un profil autorisé.
+4. Vérifier la redirection vers `/`, la bannière `AUTH DEV — local uniquement`
+   et les menus correspondant au rôle choisi.
+5. Pour tester un autre rôle, se déconnecter puis revenir directement sur
+   `/dev-login`.
+6. À la fin, se déconnecter et arrêter les deux processus avec `Ctrl+C`.
+
+En mode `dev`, il ne faut pas utiliser le bouton Microsoft de `/login`. Cette
+route reste volontairement réservée à Entra et renvoie `entra_auth_disabled`.
+L'URL prévue pour l'authentification locale est `/dev-login`.
+
+### Dépannage
+
+- `ERR_CONNECTION_REFUSED` signifie que le navigateur ne trouve pas un serveur
+  local. Vérifier les deux terminaux et redémarrer le backend ou le frontend si
+  nécessaire.
+- Après l'affichage d'une page d'erreur Chromium, ouvrir un nouvel onglet
+  plutôt que de réutiliser l'onglet en erreur.
+- Utiliser `127.0.0.1` dans l'URL plutôt que `localhost` si la résolution locale
+  pose problème.
+- Après une déconnexion, le retour sur `/login` est normal ; saisir à nouveau
+  l'URL complète `/dev-login` pour changer de fixture.
+- Changer de fixture nécessite de se déconnecter d'abord. Le changement de
+  session reste protégé par le mécanisme CSRF normal.
+
+## Tests réalisés dans le navigateur intégré
+
+Validation effectuée le 26 août 2026 avec les serveurs backend et frontend
+locaux démarrés :
+
+- La page `/dev-login` affiche les fixtures disponibles.
+- Le profil gestionnaire ouvre le tableau de bord et les liens d'administration.
+- Le profil lecteur ouvre le tableau de bord lecteur sans les actions
+  d'administration.
+- Le profil étudiant ouvre la fiche locale et affiche `Mes candidatures` ainsi
+  que `Proposer un stage`.
+- Le profil entreprise ouvre l'espace entreprise avec le mode d'impersonation
+  temporaire et l'action `Déposer une offre`.
+- Depuis le profil entreprise, la navigation vers `/offers` fonctionne et la
+  liste des offres s'affiche.
+- La déconnexion revient sur `/login`, où l'absence d'Entra en mode dev est
+  signalée comme prévu.
+
+Le parcours navigateur des pièces jointes (dépôt, téléchargement et
+suppression) n'a pas été rejoué pendant cette session ; il reste à valider
+manuellement depuis l'espace offre avec un profil autorisé.
