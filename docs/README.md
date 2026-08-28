@@ -1,7 +1,7 @@
 # Documentation
 
 Ce fichier est l'index documentaire. Les règles de lecture minimale des agents
-sont dans `AGENT.md` afin de ne pas les dupliquer ici.
+sont dans `AGENTS.md` afin de ne pas les dupliquer ici.
 
 ## Sources courantes
 
