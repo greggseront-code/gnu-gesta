@@ -11,5 +11,6 @@ review dans `docs/history/reviews/`, et ce qui reste vrai remonte dans
 | Sujet | Statut | Dossier |
 | --- | --- | --- |
 | Adresses structurées des entreprises | proposition détaillée, non engagée | `adresses-structurees-entreprises/` |
+| Gestion des stages et des conventions | spec à jour, implémentation à refaire | `gestion-stages-conventions/` |
 
 Un dossier qui ne gouverne plus aucune décision doit être fermé et archivé.
