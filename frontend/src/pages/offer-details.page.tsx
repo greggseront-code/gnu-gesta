@@ -91,7 +91,9 @@ export function OfferDetailsPage() {
           )}
           {canManage && (
             <>
-              <button className="btn btn-primary btn-sm" onClick={() => handleAction('validate')}>Valider</button>
+              <button className="btn btn-primary btn-sm" onClick={() => handleAction('validate')}>
+                {o.source_type === 'student' ? 'Accepter et ouvrir le dossier' : 'Valider et publier'}
+              </button>
               <button className="btn btn-secondary btn-sm" onClick={() => handleAction('reject')}>Refuser</button>
               <button className="btn btn-secondary btn-sm" onClick={() => handleAction('unavailable')}>Indisponible</button>
             </>

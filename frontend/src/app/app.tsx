@@ -22,6 +22,8 @@ import { StudentApplicationsPage } from '../pages/student-applications.page';
 import { AdminApplicationsPage } from '../pages/admin-applications.page';
 import { ImpersonationSelectPage } from '../pages/impersonation-select.page';
 import { DevLoginPage } from '../pages/dev-login.page';
+import { InternshipsPage } from '../pages/internships.page';
+import { InternshipDetailPage } from '../pages/internship-detail.page';
 
 function AuthGate({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -51,6 +53,12 @@ function RequireGestionnaireBase({ children }: { children: ReactNode }) {
 function RequireGestionnaireRole({ children }: { children: ReactNode }) {
   const { role } = useAuth();
   if (role !== 'gestionnaire') return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+function RequirePedagogicalRole({ children }: { children: ReactNode }) {
+  const { role } = useAuth();
+  if (role !== 'gestionnaire' && role !== 'lecteur') return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -107,6 +115,8 @@ function AppRoutes() {
         <Route path="company/dashboard" element={<CompanyDashboardPage />} />
         <Route path="student/applications" element={<StudentApplicationsPage />} />
         <Route path="admin/applications" element={<AdminApplicationsPage />} />
+        <Route path="internships" element={<RequirePedagogicalRole><InternshipsPage /></RequirePedagogicalRole>} />
+        <Route path="internships/:id" element={<RequirePedagogicalRole><InternshipDetailPage /></RequirePedagogicalRole>} />
         <Route
           path="impersonate"
           element={

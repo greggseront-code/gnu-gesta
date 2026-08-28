@@ -252,6 +252,17 @@ a:hover {
   border-color: var(--color-border-strong);
 }
 
+.btn-danger {
+  background: var(--color-danger, #b42318);
+  border-color: var(--color-danger, #b42318);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #912018;
+  border-color: #912018;
+}
+
 .btn-secondary:hover:not(:disabled) {
   background: var(--color-bg);
 }

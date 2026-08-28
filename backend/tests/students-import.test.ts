@@ -21,6 +21,11 @@ const bob = {
   date_naissance: '2005-03-15',
 };
 
+const annualImport = (students: Array<typeof alice>) => ({
+  academic_year: '2026-2027',
+  students,
+});
+
 describe('students import', () => {
   let db: Database;
 
@@ -43,14 +48,14 @@ describe('students import', () => {
 
   it('POST /api/students/import retourne { imported: N }', async () => {
     const { agent, csrfToken } = await loginAsGestionnaire();
-    const res = await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send([alice, bob]);
+    const res = await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send(annualImport([alice, bob]));
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ imported: 2 });
+    expect(res.body).toEqual({ imported: 2, academic_year: '2026-2027' });
   });
 
   it('GET /api/students retourne les étudiants importés triés par nom', async () => {
     const { agent, csrfToken } = await loginAsGestionnaire();
-    await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send([alice, bob]);
+    await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send(annualImport([alice, bob]));
 
     const res = await agent.get('/api/students');
     expect(res.status).toBe(200);
@@ -66,19 +71,19 @@ describe('students import', () => {
     const res = await agent
       .post('/api/students/import')
       .set('x-csrf-token', csrfToken)
-      .send([{ ...alice, email: 'pas-un-email' }]);
+      .send(annualImport([{ ...alice, email: 'pas-un-email' }]));
     expect(res.status).toBe(400);
   });
 
   it('POST /api/students/import est idempotent (upsert par email)', async () => {
     const { agent, csrfToken } = await loginAsGestionnaire();
-    await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send([alice]);
+    await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send(annualImport([alice]));
 
     // Reimport with updated first_name
     await agent
       .post('/api/students/import')
       .set('x-csrf-token', csrfToken)
-      .send([{ ...alice, first_name: 'Alice-Updated' }]);
+      .send(annualImport([{ ...alice, first_name: 'Alice-Updated' }]));
 
     const res = await agent.get('/api/students');
     expect(res.body).toHaveLength(1);
@@ -87,20 +92,20 @@ describe('students import', () => {
 
   it('lecteur reçoit 403 sur POST /api/students/import', async () => {
     const { agent, csrfToken } = await loginAsLecteur();
-    const res = await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send([alice]);
+    const res = await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send(annualImport([alice]));
     expect(res.status).toBe(403);
   });
 
   it('etudiant reçoit 403 sur POST /api/students/import', async () => {
     db.prepare('INSERT INTO students (first_name, last_name, email) VALUES (?, ?, ?)').run('Zoé', 'Zenith', 'zoe@student.vinci.be');
     const { agent, csrfToken } = await loginAsEtudiant('zoe@student.vinci.be');
-    const res = await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send([alice]);
+    const res = await agent.post('/api/students/import').set('x-csrf-token', csrfToken).send(annualImport([alice]));
     expect(res.status).toBe(403);
   });
 
   it('une requête POST sans jeton CSRF est refusée', async () => {
     const { agent } = await loginAsGestionnaire();
-    const res = await agent.post('/api/students/import').send([alice]);
+    const res = await agent.post('/api/students/import').send(annualImport([alice]));
     expect(res.status).toBe(403);
     expect(res.body.error).toBe('csrf_invalid');
   });

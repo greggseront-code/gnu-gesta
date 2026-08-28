@@ -45,6 +45,12 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
   technique généré par le serveur.
 * `offer_contacts` : table de liaison entre offres et contacts.
 * `applications` : candidatures des étudiants aux offres.
+* `student_academic_year_eligibility` : années pour lesquelles un étudiant a
+  été importé comme éligible au stage.
+* `internships` : dossiers de stage, origine, dates, signataire et cycle de
+  vie.
+* `internship_documents` : métadonnées de la convention générée et de la
+  convention signée ; fichiers locaux sous `backend/internship-documents/`.
 * `offer_status_history` : historique des changements de statut des offres.
 
 ## Relations
@@ -64,12 +70,21 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
 * `offer_contacts.contact_id` référence `company_contacts.id`.
 * `applications.offer_id` référence `offers.id`.
 * `applications.student_id` référence `students.id`.
+* `student_academic_year_eligibility.student_id` référence `students.id` avec
+  suppression en cascade.
+* `internships.student_id`, `company_id`, `origin_offer_id`,
+  `origin_application_id` et `signing_contact_id` référencent respectivement
+  l'étudiant, l'entreprise, l'offre d'origine, la candidature éventuelle et le
+  contact signataire.
+* `internship_documents.internship_id` référence `internships.id` avec
+  suppression en cascade.
 * `offer_status_history.offer_id` référence `offers.id`.
 
 ## Features et tables utilisées
 
 * `backend/src/features/students`
   * `students` : import, upsert par email, liste et recherche par identifiant.
+  * `student_academic_year_eligibility` : associations annuelles additives.
   * `applications` : consultée via la feature `applications` pour les
     candidatures d'un étudiant.
 
@@ -91,6 +106,14 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
     offre/étudiant.
   * `offers` : vérification et mise à jour du statut lors d'une sélection.
   * `offer_status_history` : historisation du passage à `prise`.
+  * `internships` : création dans la transaction de sélection.
+
+* `backend/src/features/internships`
+  * `student_academic_year_eligibility` : point de départ de la liste annuelle.
+  * `internships` : préparation, état, origine et unicité bloquante.
+  * `internship_documents` : conventions générée et signée.
+  * `students`, `companies`, `company_contacts`, `offers`, `applications` et
+    `offer_status_history` : détail et restauration atomique de l'origine.
 
 ## Conventions SQL
 
@@ -114,6 +137,19 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
   est unique quand les deux sont renseignés
   (`idx_users_entra_identity`).
 * `applications` impose l'unicité du couple `(offer_id, student_id)`.
+* `student_academic_year_eligibility` impose une association unique par
+  étudiant et année canonique `YYYY-YYYY` composée de deux années consécutives.
+* `internships.origin_offer_id` et `origin_application_id` sont uniques. Une
+  origine `candidature` exige une candidature ; une origine `proposition`
+  l'interdit.
+* L'index partiel `idx_internships_one_blocking_per_student` autorise au plus
+  un dossier `preparation` ou `confirme` par étudiant, toutes années
+  confondues. Les états `termine`, `interrompu` et `echoue` ne bloquent plus.
+* Les dates de stage restent nulles ensemble avant préparation ; dès qu'une
+  date de début existe, l'année académique calculée est obligatoire et la fin
+  ne peut précéder le début.
+* `internship_documents` autorise au plus un document `generated` et un
+  document `signed` par dossier, uniquement PDF ou DOCX, au plus 5 Mio.
 * `offer_attachments.storage_name` est non nul et unique ; `mime_type` est
   limité à `application/pdf` et au MIME DOCX OOXML ; `size_bytes` est compris
   entre 0 et 5 MiB. L'offre est limitée à dix lignes par le service, dans une

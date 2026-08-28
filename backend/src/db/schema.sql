@@ -120,6 +120,77 @@ CREATE TABLE IF NOT EXISTS applications (
   UNIQUE (offer_id, student_id)
 );
 
+CREATE TABLE IF NOT EXISTS student_academic_year_eligibility (
+  student_id    INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  academic_year TEXT    NOT NULL
+                        CHECK(
+                          length(academic_year) = 9
+                          AND substr(academic_year, 5, 1) = '-'
+                          AND academic_year GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]'
+                          AND CAST(substr(academic_year, 6, 4) AS INTEGER) =
+                              CAST(substr(academic_year, 1, 4) AS INTEGER) + 1
+                        ),
+  created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (student_id, academic_year)
+);
+
+CREATE INDEX IF NOT EXISTS idx_student_eligibility_academic_year
+  ON student_academic_year_eligibility(academic_year, student_id);
+
+CREATE TABLE IF NOT EXISTS internships (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  student_id         INTEGER NOT NULL REFERENCES students(id),
+  company_id         INTEGER NOT NULL REFERENCES companies(id),
+  origin_type        TEXT    NOT NULL CHECK(origin_type IN ('candidature', 'proposition')),
+  origin_offer_id    INTEGER NOT NULL UNIQUE REFERENCES offers(id),
+  origin_application_id INTEGER UNIQUE REFERENCES applications(id),
+  start_date         TEXT,
+  end_date           TEXT,
+  academic_year      TEXT,
+  signing_contact_id INTEGER REFERENCES company_contacts(id),
+  status             TEXT    NOT NULL DEFAULT 'preparation'
+                           CHECK(status IN ('preparation', 'confirme', 'termine', 'interrompu', 'echoue')),
+  confirmed_at       TEXT,
+  created_at         TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at         TEXT    NOT NULL DEFAULT (datetime('now')),
+  CHECK(
+    (origin_type = 'candidature' AND origin_application_id IS NOT NULL)
+    OR (origin_type = 'proposition' AND origin_application_id IS NULL)
+  ),
+  CHECK(start_date IS NULL OR end_date IS NULL OR end_date >= start_date),
+  CHECK(
+    (start_date IS NULL AND academic_year IS NULL)
+    OR (start_date IS NOT NULL AND academic_year IS NOT NULL)
+  )
+);
+
+-- SQLite applique aussi cet index pendant deux sélections concurrentes : la
+-- règle ne dépend donc pas d'un contrôle préalable sujet à une course.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_internships_one_blocking_per_student
+  ON internships(student_id)
+  WHERE status IN ('preparation', 'confirme');
+
+CREATE INDEX IF NOT EXISTS idx_internships_academic_year
+  ON internships(academic_year, student_id);
+
+CREATE TABLE IF NOT EXISTS internship_documents (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  internship_id  INTEGER NOT NULL REFERENCES internships(id) ON DELETE CASCADE,
+  kind           TEXT    NOT NULL CHECK(kind IN ('generated', 'signed')),
+  storage_name   TEXT    NOT NULL UNIQUE CHECK(length(storage_name) > 0),
+  original_name  TEXT    NOT NULL CHECK(length(original_name) > 0),
+  mime_type      TEXT    NOT NULL CHECK(mime_type IN (
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  )),
+  size_bytes     INTEGER NOT NULL CHECK(size_bytes >= 0 AND size_bytes <= 5242880),
+  created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (internship_id, kind)
+);
+
+CREATE INDEX IF NOT EXISTS idx_internship_documents_internship
+  ON internship_documents(internship_id, kind);
+
 CREATE TABLE IF NOT EXISTS offer_status_history (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   offer_id    INTEGER NOT NULL REFERENCES offers(id),

@@ -10,6 +10,7 @@ import {
   selectCandidate,
 } from './applications.service';
 import { getOfferById } from '../offers/offers.service';
+import { HttpError } from '../../lib/http-errors';
 
 // Mounted at /api/offers/:offerId/applications — mergeParams so :offerId is visible
 export const applicationsRouter = Router({ mergeParams: true });
@@ -43,6 +44,10 @@ applicationsRouter.post('/', requireRole('etudiant'), (req, res) => {
   } catch (err) {
     if (err instanceof DuplicateApplicationError) {
       res.status(409).json({ error: err.message });
+      return;
+    }
+    if (err instanceof HttpError) {
+      res.status(err.status).json({ error: err.message });
       return;
     }
     throw err;
@@ -101,6 +106,10 @@ selectCandidateRouter.post('/', requireRole('entreprise'), (req, res) => {
     }
     if (err instanceof OfferAlreadyTakenError) {
       res.status(409).json({ error: err.message });
+      return;
+    }
+    if (err instanceof HttpError) {
+      res.status(err.status).json({ error: err.message });
       return;
     }
     throw err;

@@ -7,7 +7,8 @@
 * `GET /api/offers/:id` : lit une offre selon les droits.
 * `GET /api/offers/:id/dependencies` : dépendances en attente (entreprise,
   contacts) bloquant la validation — gestionnaire uniquement.
-* `POST /api/offers/:id/validate` : valide une offre.
+* `POST /api/offers/:id/validate` : publie une offre classique ou accepte une
+  proposition étudiante en créant son dossier de stage.
 * `POST /api/offers/:id/reject` : refuse une offre.
 * `POST /api/offers/:id/mark-unavailable` : rend une offre indisponible.
 * `PATCH /api/offers/:id` : modifie les champs descriptifs d'une offre.
@@ -74,6 +75,9 @@ comme statut produit officiel.
   `POST /:id/validate`) que si son entreprise, son contact prioritaire et
   tous ses contacts associés sont `validated` ; sinon `409` avec
   `company_pending` et `pending_contact_ids`.
+* Une proposition étudiante acceptée passe directement à `prise`, reste privée
+  à son auteur et au gestionnaire et crée un dossier sans candidature.
+* Un étudiant ayant un dossier bloquant ne peut plus déposer de proposition.
 * Seul un `gestionnaire` valide, refuse, rend indisponible ou réaffecte
   l'entreprise et les contacts d'une offre.
 * `PATCH /:id/assignment` remplace atomiquement `company_id`,
@@ -99,6 +103,8 @@ Tables utilisées :
   et de statut de validation (dépendances, réaffectation).
 * `applications` : utilisée pour la visibilité étudiant après candidature.
 * `offer_status_history` : historique des changements de statut.
+* `internships` : création transactionnelle depuis une proposition acceptée et
+  contrôle du blocage étudiant.
 
 Points d'attention :
 
@@ -159,7 +165,7 @@ Scénarios importants :
 * Modification, liste, upload multiple, téléchargement, suppression et rejet
   des fichiers non autorisés.
 * Cycle complet : proposition étudiante avec entreprise en attente, contrôle
-  gestionnaire, validation de l'offre, visibilité pour un autre étudiant.
+  gestionnaire, acceptation privée et création du dossier.
 
 ## Documents liés
 

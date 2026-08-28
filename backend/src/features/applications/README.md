@@ -5,8 +5,8 @@
 * `POST /api/offers/:offerId/applications` : crée une candidature pour
   l'étudiant courant.
 * `GET /api/offers/:offerId/applications` : liste les candidatures d'une offre.
-* `POST /api/offers/:offerId/select-candidate` : sélectionne une candidature et
-  passe l'offre à `prise`.
+* `POST /api/offers/:offerId/select-candidate` : sélectionne une candidature,
+  passe l'offre à `prise` et crée le dossier de stage.
 
 La route `GET /api/students/:studentId/applications` est exposée par la feature
 `students`, mais utilise le service `applications`.
@@ -33,8 +33,10 @@ vers `prise` lors de la sélection d'un candidat.
   propres offres.
 * La candidature sélectionnée doit appartenir à l'offre ciblée.
 * Une offre déjà `prise` ne peut pas recevoir une nouvelle sélection.
+* Un étudiant ayant un dossier de stage bloquant ne peut ni candidater ni être
+  sélectionné.
 * La sélection est transactionnelle : candidature sélectionnée, historique de
-  statut et offre mise à jour.
+  statut, offre mise à jour et dossier de stage créé.
 
 ## Accès données
 
@@ -43,6 +45,7 @@ Tables utilisées :
 * `applications` : création, liste et sélection des candidatures.
 * `offers` : vérification de l'offre et passage à `prise`.
 * `offer_status_history` : historique du changement de statut.
+* `internships` : dossier créé par la sélection.
 
 Points d'attention :
 
@@ -73,6 +76,7 @@ Scénarios importants :
 * Contrôle d'accès entreprise sur ses propres offres.
 * Blocage IDOR lors de la sélection d'une candidature d'une autre offre.
 * Passage à `prise` et rejet d'une double sélection.
+* Création du dossier et blocage d'un étudiant déjà associé.
 
 ## Documents liés
 

@@ -3,7 +3,8 @@
 ## Endpoints
 
 * `GET /api/students` : liste les étudiants.
-* `POST /api/students/import` : importe une liste d'étudiants.
+* `POST /api/students/import` : importe une liste d'étudiants avec son année
+  académique d'éligibilité.
 * `GET /api/students/:studentId/applications` : liste les candidatures d'un
   étudiant.
 
@@ -21,8 +22,11 @@ Cette feature ne gère pas de statuts.
 
 ## Règles métier
 
-* L'import reçoit une liste structurée d'étudiants.
+* L'import reçoit `{ academic_year, students }` ; l'année est explicite et les
+  deux années civiles doivent être consécutives.
 * L'import fait un upsert basé sur l'email.
+* Il ajoute l'éligibilité annuelle sans retirer les étudiants absents d'un
+  réimport. Un étudiant peut être éligible plusieurs années.
 * L'email est obligatoire et unique, insensible à la casse
   (`idx_students_email_nocase`) : c'est la clé de liaison avec une session
   Microsoft étudiante (voir `backend/src/features/auth/README.md`).
@@ -39,6 +43,7 @@ Cette feature ne gère pas de statuts.
 Tables utilisées :
 
 * `students` : import, upsert, liste et recherche par identifiant.
+* `student_academic_year_eligibility` : années d'éligibilité importées.
 * `applications` : consultée via la feature `applications` pour lister les
   candidatures d'un étudiant.
 
@@ -73,7 +78,7 @@ Fichiers de tests :
 
 Scénarios importants :
 
-* Import d'une liste non vide.
+* Import d'une liste non vide avec année académique.
 * Rejet d'un email invalide.
 * Upsert idempotent par email.
 * Tri de la liste des étudiants.

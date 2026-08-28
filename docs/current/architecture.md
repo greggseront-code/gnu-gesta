@@ -70,6 +70,7 @@ backend/
     features/
       applications/
       companies/
+      internships/
       offers/
       students/
     middlewares/
@@ -101,6 +102,8 @@ Features backend:
 - `companies`: referentiel des entreprises et contacts.
 - `offers`: offres de stage, propositions et cycle de publication.
 - `applications`: candidatures et selection d'un candidat.
+- `internships`: dossiers de stage, éligibilités annuelles, conventions et
+  cycle de vie après sélection ou acceptation d'une proposition.
 
 Les details metier locaux sont documentes dans les README de ces dossiers.
 
@@ -117,8 +120,9 @@ Le frontend est organise autour de pages et de features:
 - `lib/`: utilitaires transversaux, dont le client API.
 
 Les pages representent les parcours utilisateur principaux: administration des
-offres et candidatures, gestion des entreprises, import etudiants, consultation
-des offres, tableau de bord entreprise et propositions etudiantes.
+offres et candidatures, gestion des entreprises, import etudiants, suivi annuel
+des dossiers et conventions, consultation des offres, tableau de bord
+entreprise et propositions etudiantes.
 
 ## Regles transversales
 
@@ -131,6 +135,9 @@ des offres, tableau de bord entreprise et propositions etudiantes.
   et candidatures.
 - Les changements de statut d'offre sont un point central du workflow et doivent
   rester coherents entre features.
+- La création ou la restauration d'un dossier de stage et de son offre
+  d'origine est transactionnelle ; l'unicité d'un dossier bloquant est aussi
+  garantie par un index SQLite partiel.
 - En environnement déployé, Microsoft Entra (tenant Haute École Léonard de
   Vinci) est la source d'identité. Le `gestionnaire` (adresse exacte) et le
   domaine étudiant `student.vinci.be` attribuent le rôle de base ; tout autre

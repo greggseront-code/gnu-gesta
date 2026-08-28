@@ -86,7 +86,10 @@ export function AppLayout() {
                 <NavLink to="/admin/offers" className={link}>Admin offres</NavLink>
               )}
               {(role === 'gestionnaire' || role === 'lecteur') && (
-                <NavLink to="/admin/applications" className={link}>Candidatures</NavLink>
+                <>
+                  <NavLink to="/internships" className={link}>Dossiers de stage</NavLink>
+                  <NavLink to="/admin/applications" className={link}>Candidatures</NavLink>
+                </>
               )}
               {role === 'entreprise' && (
                 <NavLink to="/offers/new" className={link}>+ Déposer une offre</NavLink>
