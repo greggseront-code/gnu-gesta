@@ -255,7 +255,7 @@ export function AdminOffersPage() {
                           disabled={hasBlockers}
                           title={hasBlockers ? 'Validez d\'abord les dépendances en attente.' : undefined}
                         >
-                          {offer.source_type === 'student' ? 'Accepter et ouvrir le dossier' : 'Valider et publier'}
+                          Valider
                         </button>
                         <button
                           className="btn btn-secondary btn-sm"

@@ -34,43 +34,6 @@ export function upsertStudents(db: Database, rows: StudentInput[]): number {
   return run(rows) as number;
 }
 
-export function upsertStudentsForAcademicYear(
-  db: Database,
-  rows: StudentInput[],
-  academicYear: string,
-): number {
-  const upsert = db.prepare(`
-    INSERT INTO students (matricule, first_name, last_name, email, date_naissance)
-    VALUES (@matricule, @first_name, @last_name, @email, @date_naissance)
-    ON CONFLICT(email) DO UPDATE SET
-      matricule      = excluded.matricule,
-      first_name     = excluded.first_name,
-      last_name      = excluded.last_name,
-      date_naissance = excluded.date_naissance
-  `);
-  const findId = db.prepare('SELECT id FROM students WHERE email = ? COLLATE NOCASE');
-  const linkEligibility = db.prepare(`
-    INSERT INTO student_academic_year_eligibility (student_id, academic_year)
-    VALUES (?, ?)
-    ON CONFLICT(student_id, academic_year) DO NOTHING
-  `);
-
-  return db.transaction(() => {
-    for (const student of rows) {
-      upsert.run({
-        matricule: student.matricule ?? null,
-        first_name: student.first_name,
-        last_name: student.last_name,
-        email: student.email,
-        date_naissance: student.date_naissance ?? null,
-      });
-      const found = findId.get(student.email) as { id: number };
-      linkEligibility.run(found.id, academicYear);
-    }
-    return rows.length;
-  })();
-}
-
 export function listStudents(db: Database): Student[] {
   return db
     .prepare('SELECT * FROM students ORDER BY last_name, first_name')

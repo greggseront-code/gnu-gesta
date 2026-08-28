@@ -86,13 +86,6 @@ lecteur, et test des deux incarnations depuis le compte gestionnaire.
   sous `backend/uploads/`, hors de la sauvegarde SQLite et sans réplication.
   Un stockage durable et contrôlé devra être défini avant un usage de
   production.
-* **Conventions locales** : les conventions générées et signées sont écrites
-  sous `backend/internship-documents/`, elles aussi hors de la sauvegarde
-  SQLite et sans réplication. Le stockage durable doit préserver les contrôles
-  d'accès et distinguer la version générée de la version signée.
-* **Modèle de convention** : le texte institutionnel fixe de
-  `backend/assets/convention-template.docx`, dérivé de l'annexe fournie, doit
-  être relu et validé officiellement avant tout usage réel.
 
 * **Un seul gestionnaire** : l'adresse est figée dans `GESTA_MANAGER_EMAIL`
   (configuration, pas base de données). Pas de gestion dynamique de

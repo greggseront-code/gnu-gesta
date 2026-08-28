@@ -14,8 +14,7 @@ entreprise de sélectionner un candidat.
 
 * Un étudiant consulte une offre visible et dépose une candidature.
 * L'entreprise consulte les candidatures reçues sur ses offres.
-* L'entreprise sélectionne un candidat, ce qui clôt l'offre comme `prise` et
-  ouvre atomiquement son dossier de stage.
+* L'entreprise sélectionne un candidat, ce qui clôt l'offre comme `prise`.
 * L'équipe pédagogique peut consulter les candidatures.
 
 ### Règles principales
@@ -24,10 +23,7 @@ entreprise de sélectionner un candidat.
 * Un étudiant ne peut postuler qu'une seule fois à la même offre.
 * Les candidatures ne sont acceptées que sur les offres `validee_et_visible`.
 * Une entreprise ne peut sélectionner un candidat que sur ses propres offres.
-* La sélection d'un candidat fait passer l'offre à `prise` et crée le dossier
-  de stage lié dans la même transaction.
-* Un étudiant ayant déjà un dossier `preparation` ou `confirme` ne peut plus
-  postuler ni être sélectionné pour un autre stage.
+* La sélection d'un candidat fait passer l'offre à `prise`.
 
 ### Contrat front/back
 
@@ -36,7 +32,7 @@ entreprise de sélectionner un candidat.
 * `GET /api/students/:studentId/applications` : lister les candidatures d'un étudiant.
 * `POST /api/offers/:offerId/select-candidate` : sélectionner une candidature.
 * Type frontend principal : `Application`.
-* La sélection retourne l'offre mise à jour et l'identifiant du dossier créé.
+* La sélection retourne une `Offer` mise à jour.
 
 ### Pages frontend concernées
 
@@ -259,9 +255,6 @@ des propositions étudiantes.
 * Le gestionnaire peut réaffecter atomiquement l'entreprise, le contact
   prioritaire et les contacts associés d'une offre vers des éléments déjà
   validés.
-* Le gestionnaire accepte directement une proposition étudiante : elle passe
-  à `prise` et ouvre un dossier privé, sans publication ni candidature
-  artificielle.
 * Les étudiants consultent les offres visibles et peuvent postuler.
 * Une entreprise suit ses offres et les candidatures associées.
 
@@ -281,8 +274,6 @@ des propositions étudiantes.
 * Les offres `prise` ou `non_disponible` ne sont plus ouvertes comme offres
   disponibles.
 * Les gestionnaires pilotent les changements de statut pédagogiques.
-* Un étudiant ayant un dossier bloquant ne peut soumettre une nouvelle
-  proposition ; l'acceptation est également revérifiée côté serveur.
 
 ### Contrat front/back
 
@@ -290,8 +281,7 @@ des propositions étudiantes.
 * `POST /api/offers` : créer une offre ou une proposition.
 * `GET /api/offers/:id` : lire une offre selon les droits.
 * `GET /api/offers/:id/dependencies` : dépendances en attente (gestionnaire).
-* `POST /api/offers/:id/validate` : publier une offre classique ou accepter
-  une proposition étudiante et ouvrir son dossier de stage.
+* `POST /api/offers/:id/validate` : valider une offre.
 * `POST /api/offers/:id/reject` : refuser une offre.
 * `POST /api/offers/:id/mark-unavailable` : rendre une offre indisponible.
 * `PATCH /api/offers/:id` : modifier une offre.
@@ -349,89 +339,6 @@ des propositions étudiantes.
   laissait des contacts orphelins, a été retirée au profit de
   `PATCH /api/offers/:id/assignment`.
 
-## Internships
-
-### But métier
-
-Suivre chaque dossier de stage indépendamment de son offre d'origine, préparer
-et protéger sa convention, puis offrir à l'équipe pédagogique une vue annuelle
-complète incluant les étudiants sans stage.
-
-### Parcours utilisateur
-
-* Une sélection de candidature ou l'acceptation d'une proposition crée un
-  dossier en `preparation`.
-* Le gestionnaire renseigne les dates et le contact signataire, génère la
-  convention DOCX, puis dépose la version signée PDF ou DOCX.
-* Le gestionnaire confirme ensuite le stage ou lui applique un état terminal.
-* Le gestionnaire et le lecteur consultent la liste annuelle et exportent le
-  même jeu de données en Excel ; le lecteur reste strictement en lecture seule.
-
-### Règles principales
-
-* Un étudiant a au plus un dossier bloquant (`preparation` ou `confirme`),
-  toutes années confondues.
-* L'année du stage est calculée depuis la date de début et doit correspondre à
-  une année d'éligibilité importée pour l'étudiant.
-* La génération exige les dates, un contact signataire et l'adresse de
-  l'entreprise. Toute modification de préparation invalide la convention
-  vierge précédemment générée.
-* La confirmation exige une convention signée. Les états `termine`,
-  `interrompu` et `echoue` libèrent l'étudiant pour un futur stage.
-* La suppression simple est réservée à un dossier en préparation dont le
-  début n'est pas passé ; elle restaure atomiquement l'offre ou la candidature
-  d'origine.
-
-### Contrat front/back
-
-* `GET /api/internships/years` : lister les années importées.
-* `GET /api/internships?academic_year=YYYY-YYYY` : liste annuelle.
-* `GET /api/internships/export/:academicYear` : exporter cette liste en XLSX.
-* `GET /api/internships/:id` : lire un dossier enrichi.
-* `PATCH /api/internships/:id` : préparer dates et contact signataire.
-* `POST /api/internships/:id/generate-convention` : générer la convention.
-* `POST /api/internships/:id/signed-convention` : déposer la convention signée.
-* `GET /api/internships/:id/documents/:kind` : télécharger une convention.
-* `POST /api/internships/:id/confirm` : confirmer le stage.
-* `POST /api/internships/:id/terminal-status` : terminer, interrompre ou
-  marquer en échec.
-* `DELETE /api/internships/:id` : supprimer un dossier encore annulable.
-* Types frontend principaux : `Internship`, `InternshipAnnualRow`,
-  `InternshipStatus`, `InternshipDocument`.
-
-### Pages frontend concernées
-
-* `frontend/src/pages/internships.page.tsx`
-* `frontend/src/pages/internship-detail.page.tsx`
-* `frontend/src/pages/students-import.page.tsx`
-* `frontend/src/pages/admin-offers.page.tsx`
-* `frontend/src/pages/offer-details.page.tsx`
-
-### Briques frontend concernées
-
-* `frontend/src/features/internships/internships.api.ts`
-* `frontend/src/features/internships/internships.types.ts`
-
-### Backend lié
-
-* `backend/src/features/internships/README.md`
-
-### Cas limites
-
-* Les documents sont stockés localement sous
-  `backend/internship-documents/` : ce stockage doit être remplacé ou sauvegardé
-  explicitement avant la production.
-* Le modèle DOCX est une copie applicative versionnée de l'annexe fournie. Son
-  texte institutionnel fixe doit être validé par l'établissement avant usage
-  réel.
-* La liste annuelle présente le dossier le plus récent de l'année si un
-  étudiant possède plusieurs dossiers historiques non bloquants sur cette
-  même année.
-* Tant que les dates ne permettent pas encore de calculer l'année du dossier,
-  un dossier en préparation apparaît provisoirement dans l'éligibilité la plus
-  récente de l'étudiant. Il rejoint son année définitive à l'enregistrement de
-  la date de début.
-
 ## Students
 
 ### But métier
@@ -441,26 +348,23 @@ Maintenir le référentiel des étudiants pour permettre l'identification des
 
 ### Parcours utilisateur
 
-* Un gestionnaire importe une liste d'étudiants pour une année académique
-  explicite.
+* Un gestionnaire importe une liste d'étudiants.
 * Les étudiants sont disponibles pour la sélection de rôle en V1.
 * Un étudiant consulte ses candidatures.
 * L'équipe pédagogique peut consulter la liste des étudiants.
 
 ### Règles principales
 
-* L'import se fait par liste structurée et année canonique `YYYY-YYYY`.
+* L'import se fait par liste structurée.
 * L'email est obligatoire et unique.
-* Un nouvel import met à jour les étudiants existants par email et ajoute leur
-  éligibilité annuelle sans retirer les absents d'un réimport.
+* Un nouvel import met à jour les étudiants existants par email.
 * Seul un gestionnaire peut importer des étudiants.
 * Un étudiant ne consulte que ses propres candidatures.
 
 ### Contrat front/back
 
 * `GET /api/students` : lister les étudiants.
-* `POST /api/students/import` : importer `{ academic_year, students }` et créer
-  les éligibilités correspondantes.
+* `POST /api/students/import` : importer des étudiants.
 * `GET /api/students/:studentId/applications` : lister les candidatures d'un
   étudiant.
 * Types frontend principaux : `Student`, `StudentInput`.
@@ -493,5 +397,3 @@ Maintenir le référentiel des étudiants pour permettre l'identification des
   (`userPrincipalName`/`mail`) reste authentifié mais bloqué
   (`student_not_imported`) : aucune fiche n'est créée automatiquement.
 * Le matricule est optionnel dans l'import, mais unique s'il est présent.
-* Un import annuel est additif : retirer explicitement une éligibilité n'est
-  pas prévu dans cette V1.

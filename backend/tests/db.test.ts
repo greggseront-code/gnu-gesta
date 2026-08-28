@@ -28,9 +28,6 @@ test('schema creates all required tables', () => {
   expect(names).toContain('offers');
   expect(names).toContain('offer_attachments');
   expect(names).toContain('applications');
-  expect(names).toContain('student_academic_year_eligibility');
-  expect(names).toContain('internships');
-  expect(names).toContain('internship_documents');
   expect(names).toContain('offer_status_history');
 });
 

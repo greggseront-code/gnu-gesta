@@ -31,4 +31,3 @@ structure actuelle.
 | Pièces jointes des offres | `phases/2026-08-02-pieces-jointes-offres-spec.md` | `phases/2026-08-02-pieces-jointes-offres-plan.md` | `reviews/2026-08-02-pieces-jointes-offres.md` |
 | Authentification locale sûre | `phases/2026-08-26-authentification-locale-safe-proposal.md` | — | — |
 | Refonte documentaire et contexte | `phases/2026-08-26-refonte-documentaire-migration.md` | — | `reviews/2026-08-26-refonte-documentaire.md` |
-| Gestion des stages et conventions | `phases/2026-08-26-gestion-stages-conventions-spec.md` | `phases/2026-08-26-gestion-stages-conventions-plan.md` | `reviews/2026-08-26-gestion-stages-conventions.md` |

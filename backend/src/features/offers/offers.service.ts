@@ -29,12 +29,6 @@ import {
   MAX_ATTACHMENT_SIZE_BYTES,
 } from './offer-attachments.storage';
 import type { OfferAttachment } from './offers.types';
-import { findBlockingInternshipByStudent, insertInternship } from '../internships/internships.queries';
-import {
-  InternshipOriginAlreadyUsedError,
-  StudentAlreadyHasInternshipError,
-  translateInternshipConstraint,
-} from '../internships/internships.errors';
 
 interface AuthContext {
   role: Role | null;
@@ -68,10 +62,6 @@ function getDependencyBlockers(
 
 export function createOffer(input: OfferInput, auth: AuthContext): Offer {
   const db = getDb();
-
-  if (auth.role === 'etudiant' && auth.entityId != null && findBlockingInternshipByStudent(db, auth.entityId)) {
-    throw new StudentAlreadyHasInternshipError();
-  }
 
   // L'entreprise doit etre visible pour l'auteur (validee, ou sa propre
   // soumission en attente pour un etudiant) ; les contacts doivent lui
@@ -162,28 +152,6 @@ export function validateOffer(id: number): Offer {
       "Cette offre dépend d'une entreprise ou d'un contact encore en attente de validation.",
       blockers,
     );
-  }
-  if (offer.source_type === 'student') {
-    if (offer.status !== 'soumise' || offer.submitted_by_student_id == null) {
-      throw new InternshipOriginAlreadyUsedError();
-    }
-    if (findBlockingInternshipByStudent(db, offer.submitted_by_student_id)) {
-      throw new StudentAlreadyHasInternshipError();
-    }
-    return db.transaction(() => {
-      const updated = updateOfferStatus(db, id, 'prise');
-      try {
-        insertInternship(db, {
-          student_id: offer.submitted_by_student_id!,
-          company_id: offer.company_id,
-          origin_type: 'proposition',
-          origin_offer_id: offer.id,
-        });
-      } catch (error) {
-        translateInternshipConstraint(error);
-      }
-      return updated;
-    })();
   }
   return updateOfferStatus(db, id, 'validee_et_visible');
 }

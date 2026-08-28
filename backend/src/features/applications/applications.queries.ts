@@ -1,11 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import type { Application } from './applications.types';
 import type { Offer } from '../offers/offers.types';
-import { findBlockingInternshipByStudent, insertInternship } from '../internships/internships.queries';
-import {
-  StudentAlreadyHasInternshipError,
-  translateInternshipConstraint,
-} from '../internships/internships.errors';
 
 export class DuplicateApplicationError extends Error {
   status = 409;
@@ -29,9 +24,6 @@ export class OfferAlreadyTakenError extends Error {
 }
 
 export function insertApplication(db: Database, offerId: number, studentId: number): Application {
-  if (findBlockingInternshipByStudent(db, studentId)) {
-    throw new StudentAlreadyHasInternshipError();
-  }
   try {
     return db
       .prepare(
@@ -87,8 +79,8 @@ export function selectCandidateAndCloseOffer(
     // Security invariant: never trust the application id alone, because it is
     // submitted inside an offer-scoped route and must belong to that offer.
     const application = db
-      .prepare('SELECT offer_id, student_id FROM applications WHERE id = ?')
-      .get(applicationId) as { offer_id: number; student_id: number } | undefined;
+      .prepare('SELECT offer_id FROM applications WHERE id = ?')
+      .get(applicationId) as { offer_id: number } | undefined;
 
     if (!application || application.offer_id !== offerId) {
       throw new ApplicationOfferMismatchError();
@@ -102,35 +94,17 @@ export function selectCandidateAndCloseOffer(
       throw new OfferAlreadyTakenError();
     }
 
-    if (findBlockingInternshipByStudent(db, application.student_id)) {
-      throw new StudentAlreadyHasInternshipError();
-    }
-
     db.prepare('UPDATE applications SET selected = 1 WHERE id = ?').run(applicationId);
 
     db.prepare(
       `INSERT INTO offer_status_history (offer_id, from_status, to_status) VALUES (?, ?, ?)`,
     ).run(offerId, current?.status ?? null, 'prise');
 
-    const updatedOffer = db
+    return db
       .prepare(
         `UPDATE offers SET status = 'prise', updated_at = datetime('now') WHERE id = ? RETURNING *`,
       )
       .get(offerId) as Offer;
-
-    try {
-      insertInternship(db, {
-        student_id: application.student_id,
-        company_id: updatedOffer.company_id,
-        origin_type: 'candidature',
-        origin_offer_id: offerId,
-        origin_application_id: applicationId,
-      });
-    } catch (error) {
-      translateInternshipConstraint(error);
-    }
-
-    return updatedOffer;
   });
 
   return run();

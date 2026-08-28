@@ -475,7 +475,7 @@ describe('offers backend', () => {
     expect(managerDetail.status).toBe(200);
   });
 
-  it('cycle complet : une proposition acceptée crée un dossier et reste privée', async () => {
+  it('cycle complet : proposition étudiante, contrôle des données, validation de l\'offre, puis visibilité pour un autre étudiant', async () => {
     insertStudent(db, 'bob@student.vinci.be');
     const alice = await loginAsEtudiant(studentEmail);
     const bob = await loginAsEtudiant('bob@student.vinci.be');
@@ -527,21 +527,14 @@ describe('offers backend', () => {
     expect(acceptCompany.body.validation_status).toBe('validated');
     expect(acceptCompany.body.contacts[0].validation_status).toBe('validated');
 
-    // 6. Le gestionnaire peut désormais accepter la proposition.
+    // 6. Le gestionnaire peut désormais valider l'offre.
     const validateRes = await manager.agent.post(`/api/offers/${offerId}/validate`).set('x-csrf-token', manager.csrfToken);
     expect(validateRes.status).toBe(200);
-    expect(validateRes.body.status).toBe('prise');
-    const internship = db.prepare('SELECT * FROM internships WHERE origin_offer_id = ?').get(offerId) as {
-      student_id: number;
-      origin_type: string;
-    };
-    const aliceId = (db.prepare('SELECT id FROM students WHERE email = ?').get(studentEmail) as { id: number }).id;
-    expect(internship.student_id).toBe(aliceId);
-    expect(internship.origin_type).toBe('proposition');
+    expect(validateRes.body.status).toBe('validee_et_visible');
 
-    // 7. Bob voit l'entreprise validée, mais jamais la proposition d'Alice.
+    // 7. Bob voit maintenant l'offre publiée (et l'entreprise, désormais validée).
     const bobOffersAfter = await bob.agent.get('/api/offers');
-    expect(bobOffersAfter.body.map((o: { id: number }) => o.id)).not.toContain(offerId);
+    expect(bobOffersAfter.body.map((o: { id: number }) => o.id)).toContain(offerId);
     const bobCompaniesAfter = await bob.agent.get('/api/companies');
     expect(bobCompaniesAfter.body.map((c: { id: number }) => c.id)).toContain(pendingCompany.id);
   });

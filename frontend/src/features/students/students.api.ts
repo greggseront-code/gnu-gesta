@@ -5,9 +5,9 @@ export function listStudents(): Promise<Student[]> {
   return apiFetch<Student[]>('/students');
 }
 
-export function importStudents(rows: StudentInput[], academicYear: string): Promise<{ imported: number; academic_year: string }> {
-  return apiFetch<{ imported: number; academic_year: string }>('/students/import', {
+export function importStudents(rows: StudentInput[]): Promise<{ imported: number }> {
+  return apiFetch<{ imported: number }>('/students/import', {
     method: 'POST',
-    body: JSON.stringify({ academic_year: academicYear, students: rows }),
+    body: JSON.stringify(rows),
   });
 }

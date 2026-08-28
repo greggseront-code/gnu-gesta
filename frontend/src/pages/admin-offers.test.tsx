@@ -97,7 +97,7 @@ test('affiche la dépendance en attente et désactive la validation', async () =
   renderPage();
 
   expect(await screen.findByText(/doivent être validés avant de pouvoir publier cette offre/)).toBeInTheDocument();
-  const validateButton = screen.getByRole('button', { name: 'Accepter et ouvrir le dossier' });
+  const validateButton = screen.getByRole('button', { name: 'Valider' });
   expect(validateButton).toBeDisabled();
 });
 
@@ -109,7 +109,7 @@ test('valide une offre sans dépendance en attente', async () => {
 
   renderPage();
 
-  const validateButton = await screen.findByRole('button', { name: 'Accepter et ouvrir le dossier' });
+  const validateButton = await screen.findByRole('button', { name: 'Valider' });
   expect(validateButton).not.toBeDisabled();
 
   await userEvent.click(validateButton);

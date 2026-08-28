@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { requireRole } from '../../middlewares/authorization.middleware';
-import { importStudentsForAcademicYear, listStudents } from './students.service';
+import { importStudents, listStudents } from './students.service';
+import { StudentsImportSchema } from './students.schemas';
 import { getApplicationsByStudent } from '../applications/applications.service';
-import { StudentsAnnualImportSchema } from '../internships/internships.schemas';
 
 export const studentsRouter = Router();
 
@@ -20,15 +20,12 @@ studentsRouter.post(
   '/import',
   requireRole('gestionnaire'),
   (req, res) => {
-    const result = StudentsAnnualImportSchema.safeParse(req.body);
+    const result = StudentsImportSchema.safeParse(req.body);
     if (!result.success) {
       res.status(400).json({ error: result.error.flatten() });
       return;
     }
-    res.json({
-      imported: importStudentsForAcademicYear(result.data.students, result.data.academic_year),
-      academic_year: result.data.academic_year,
-    });
+    res.json({ imported: importStudents(result.data) });
   },
 );
 
