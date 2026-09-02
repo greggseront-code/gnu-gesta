@@ -1,6 +1,6 @@
 # État courant
 
-Date de l'instantané : 2026-08-26
+Date de l'instantané : 2026-09-02
 
 - Branche de référence : `main`.
 - Application : gestion des stages avec frontend React, API Express et SQLite.
@@ -10,6 +10,10 @@ Date de l'instantané : 2026-08-26
   `docs/work/active/adresses-structurees-entreprises/`.
 - Autre sujet non engagé : départements d'entreprise, dans
   `docs/current/backlog.md`.
+- Gestion des stages et conventions : besoin respecifié après rollback ; plan
+  de réimplémentation prêt dans
+  `docs/work/active/gestion-stages-conventions/plan.md`. Prochaine tranche :
+  import et éligibilité annuelle.
 - Avant un usage avec trafic et données réels : traiter
   `docs/operations/production-readiness.md`.
 
