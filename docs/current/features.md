@@ -348,26 +348,32 @@ Maintenir le référentiel des étudiants pour permettre l'identification des
 
 ### Parcours utilisateur
 
-* Un gestionnaire importe une liste d'étudiants.
+* Un gestionnaire choisit une année académique et importe la liste des
+  étudiants éligibles pour cette année.
 * Les étudiants sont disponibles pour la sélection de rôle en V1.
 * Un étudiant consulte ses candidatures.
 * L'équipe pédagogique peut consulter la liste des étudiants.
 
 ### Règles principales
 
-* L'import se fait par liste structurée.
+* L'import se fait par liste structurée et année académique explicite au format
+  `AAAA-AAAA`, avec deux années consécutives.
 * L'email est obligatoire et unique.
 * Un nouvel import met à jour les étudiants existants par email.
+* Un étudiant peut être éligible sur plusieurs années ; un réimport est
+  additif et ne retire aucune éligibilité antérieure.
 * Seul un gestionnaire peut importer des étudiants.
 * Un étudiant ne consulte que ses propres candidatures.
 
 ### Contrat front/back
 
 * `GET /api/students` : lister les étudiants.
-* `POST /api/students/import` : importer des étudiants.
+* `POST /api/students/import` : importer `{ academic_year, students }` et
+  retourner `{ imported, academic_year }`.
 * `GET /api/students/:studentId/applications` : lister les candidatures d'un
   étudiant.
-* Types frontend principaux : `Student`, `StudentInput`.
+* Types frontend principaux : `Student`, `StudentInput`,
+  `StudentsImportInput`, `StudentsImportResult`.
 
 ### Pages frontend concernées
 
@@ -390,6 +396,8 @@ Maintenir le référentiel des étudiants pour permettre l'identification des
 
 * Le format exact du CSV n'est pas porté par cette feature backend : l'API reçoit
   déjà des lignes structurées.
+* Le formulaire refuse localement une année mal formée ou non consécutive et
+  n'émet alors aucune requête.
 * `GET /api/students` exige une session authentifiée
   (`gestionnaire`, `lecteur` ou `entreprise` — utilisé comme référentiel par
   admin candidatures et l'espace entreprise ; pas `etudiant`).

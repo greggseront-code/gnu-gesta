@@ -33,6 +33,8 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
   `backend/src/features/auth/session.store.ts`), 8h renouvelables. Remplace
   le `MemoryStore` du pilote.
 * `students` : référentiel des étudiants.
+* `student_academic_year_eligibility` : rattachement additif des étudiants aux
+  années académiques pour lesquelles ils sont éligibles au stage.
 * `companies` : référentiel des entreprises. Porte un état de validation
   (`validation_status`), l'étudiant créateur éventuel
   (`submitted_by_student_id`) et la date de validation (`validated_at`).
@@ -50,6 +52,8 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
 ## Relations
 
 * `company_contacts.company_id` référence `companies.id`.
+* `student_academic_year_eligibility.student_id` référence `students.id` avec
+  suppression en cascade.
 * `companies.submitted_by_student_id` référence `students.id` (étudiant
   créateur d'une soumission ; `NULL` pour un élément créé directement validé).
 * `company_contacts.submitted_by_student_id` référence `students.id`, avec la
@@ -70,6 +74,8 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
 
 * `backend/src/features/students`
   * `students` : import, upsert par email, liste et recherche par identifiant.
+  * `student_academic_year_eligibility` : création idempotente des associations
+    étudiant/année lors de l'import.
   * `applications` : consultée via la feature `applications` pour les
     candidatures d'un étudiant.
 
@@ -109,6 +115,9 @@ Les tests peuvent utiliser une base SQLite en mémoire via `createTestDb()`.
   lien entre une session étudiante et sa fiche `students` se fait par cet
   email (`userPrincipalName` Microsoft, puis `mail` en repli).
 * `students.matricule` est unique s'il est renseigné.
+* `student_academic_year_eligibility` impose l'unicité du couple
+  `(student_id, academic_year)` ; un étudiant peut donc appartenir à plusieurs
+  années, mais jamais deux fois à la même.
 * `users.email` est unique, insensible à la casse
   (`idx_users_email_nocase`) ; le couple `(entra_tenant_id, entra_object_id)`
   est unique quand les deux sont renseignés

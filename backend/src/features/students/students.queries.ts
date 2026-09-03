@@ -7,8 +7,12 @@ import type { Student, StudentInput } from './students.types';
 // doublons de casse mais n'est pas couvert par cet upsert : un import réel
 // réutilise systématiquement la même casse que l'annuaire source, donc ce
 // cas limite est accepté sans upsert chaîné supplémentaire.
-export function upsertStudents(db: Database, rows: StudentInput[]): number {
-  const stmt = db.prepare(`
+export function importStudentsForAcademicYear(
+  db: Database,
+  rows: StudentInput[],
+  academicYear: string,
+): number {
+  const upsertStudent = db.prepare(`
     INSERT INTO students (matricule, first_name, last_name, email, date_naissance)
     VALUES (@matricule, @first_name, @last_name, @email, @date_naissance)
     ON CONFLICT(email) DO UPDATE SET
@@ -17,16 +21,24 @@ export function upsertStudents(db: Database, rows: StudentInput[]): number {
       last_name      = excluded.last_name,
       date_naissance = excluded.date_naissance
   `);
+  const findStudentId = db.prepare('SELECT id FROM students WHERE email = ? COLLATE NOCASE');
+  const addEligibility = db.prepare(`
+    INSERT INTO student_academic_year_eligibility (student_id, academic_year)
+    VALUES (?, ?)
+    ON CONFLICT(student_id, academic_year) DO NOTHING
+  `);
 
   const run = db.transaction((students: StudentInput[]) => {
     for (const s of students) {
-      stmt.run({
+      upsertStudent.run({
         matricule: s.matricule ?? null,
         first_name: s.first_name,
         last_name: s.last_name,
         email: s.email,
         date_naissance: s.date_naissance ?? null,
       });
+      const student = findStudentId.get(s.email) as { id: number };
+      addEligibility.run(student.id, academicYear);
     }
     return students.length;
   });

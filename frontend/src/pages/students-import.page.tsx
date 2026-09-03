@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { importStudents } from '../features/students/students.api';
-import type { StudentInput } from '../features/students/students.types';
+import type { StudentInput, StudentsImportResult } from '../features/students/students.types';
+import { currentAcademicYear, isValidAcademicYear } from '../lib/academic-year';
 
 type ParseResult =
   | { ok: true; rows: StudentInput[] }
@@ -65,9 +66,10 @@ export function StudentsImportPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [preview, setPreview] = useState<StudentInput[] | null>(null);
+  const [academicYear, setAcademicYear] = useState(currentAcademicYear());
   const [parseError, setParseError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<{ imported: number } | null>(null);
+  const [result, setResult] = useState<StudentsImportResult | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -88,18 +90,21 @@ export function StudentsImportPage() {
     setPreview(parsed.rows);
   }
 
-  async function handleImport() {
-    if (!preview) return;
+  const academicYearIsValid = isValidAcademicYear(academicYear);
+
+  async function handleImport(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!preview || !academicYearIsValid) return;
     setImporting(true);
     setImportError(null);
     try {
-      const res = await importStudents(preview);
+      const res = await importStudents({ academic_year: academicYear, students: preview });
       setResult(res);
       setPreview(null);
       setFileName(null);
       if (inputRef.current) inputRef.current.value = '';
     } catch (err) {
-      setImportError(String(err));
+      setImportError(err instanceof Error ? err.message : String(err));
     } finally {
       setImporting(false);
     }
@@ -116,12 +121,38 @@ export function StudentsImportPage() {
         </div>
       </div>
 
-      <div className="stack-lg">
+      <form className="stack-lg" onSubmit={handleImport} noValidate>
         <div className="card">
           <div className="card-header">
             <span className="card-title">Sélectionner un fichier Excel</span>
           </div>
           <div className="card-body">
+            <div className="form-group" style={{ maxWidth: '20rem', marginBottom: '1rem' }}>
+              <label className="form-label form-label-required" htmlFor="academic-year">
+                Année académique d'éligibilité
+              </label>
+              <input
+                id="academic-year"
+                className="form-input"
+                required
+                placeholder="2026-2027"
+                value={academicYear}
+                aria-invalid={!academicYearIsValid}
+                aria-describedby={academicYearIsValid ? 'academic-year-help' : 'academic-year-help academic-year-error'}
+                onChange={(event) => {
+                  setAcademicYear(event.target.value);
+                  setResult(null);
+                }}
+              />
+              <p id="academic-year-help" className="form-hint">
+                Exemple : 2026-2027. Tous les étudiants du fichier seront rattachés à cette année ; un réimport ne retire personne.
+              </p>
+              {!academicYearIsValid && (
+                <p id="academic-year-error" className="form-error" role="alert">
+                  L'année académique doit suivre le format AAAA-AAAA avec deux années consécutives.
+                </p>
+              )}
+            </div>
             <p className="text-muted" style={{ marginBottom: '1rem', fontSize: '0.875rem' }}>
               Format attendu : fichier <strong>.xlsx</strong> avec les colonnes{' '}
               <code>Matricule</code>, <code>Nom</code>, <code>Prénom</code>, <code>Email</code>, <code>Date-Naissance</code>.
@@ -150,7 +181,7 @@ export function StudentsImportPage() {
         {result && (
           <div className="alert alert-success">
             <strong>{result.imported} étudiant{result.imported !== 1 ? 's' : ''} importé{result.imported !== 1 ? 's' : ''}.</strong>
-            {' '}
+            {' '}Éligibilité enregistrée pour {result.academic_year}.{' '}
             <Link to="/admin/students">Voir la liste →</Link>
           </div>
         )}
@@ -165,10 +196,12 @@ export function StudentsImportPage() {
               <span className="card-title">Aperçu — {preview.length} étudiant{preview.length !== 1 ? 's' : ''} détecté{preview.length !== 1 ? 's' : ''}</span>
               <button
                 className="btn btn-primary"
-                onClick={handleImport}
-                disabled={importing}
+                type="submit"
+                disabled={importing || !academicYearIsValid}
               >
-                {importing ? 'Import en cours…' : `Importer ${preview.length} étudiant${preview.length !== 1 ? 's' : ''}`}
+                {importing
+                  ? 'Import en cours…'
+                  : `Importer ${preview.length} étudiant${preview.length !== 1 ? 's' : ''} pour ${academicYear}`}
               </button>
             </div>
             <div className="table-wrapper">
@@ -204,7 +237,7 @@ export function StudentsImportPage() {
             </div>
           </div>
         )}
-      </div>
+      </form>
     </div>
   );
 }

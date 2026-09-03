@@ -22,10 +22,16 @@ studentsRouter.post(
   (req, res) => {
     const result = StudentsImportSchema.safeParse(req.body);
     if (!result.success) {
-      res.status(400).json({ error: result.error.flatten() });
+      res.status(400).json({
+        error: "Les données d'import sont invalides.",
+        details: result.error.flatten(),
+      });
       return;
     }
-    res.json({ imported: importStudents(result.data) });
+    res.json({
+      imported: importStudents(result.data),
+      academic_year: result.data.academic_year,
+    });
   },
 );
 

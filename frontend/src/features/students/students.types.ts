@@ -6,6 +6,16 @@ export interface StudentInput {
   date_naissance?: string;
 }
 
+export interface StudentsImportInput {
+  academic_year: string;
+  students: StudentInput[];
+}
+
+export interface StudentsImportResult {
+  imported: number;
+  academic_year: string;
+}
+
 export interface Student {
   id: number;
   matricule: string | null;

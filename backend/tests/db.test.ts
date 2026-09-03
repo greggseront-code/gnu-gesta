@@ -22,6 +22,7 @@ test('schema creates all required tables', () => {
   expect(names).toContain('users');
   expect(names).toContain('sessions');
   expect(names).toContain('students');
+  expect(names).toContain('student_academic_year_eligibility');
   expect(names).toContain('companies');
   expect(names).toContain('company_contacts');
   expect(names).toContain('offer_contacts');
@@ -29,6 +30,26 @@ test('schema creates all required tables', () => {
   expect(names).toContain('offer_attachments');
   expect(names).toContain('applications');
   expect(names).toContain('offer_status_history');
+});
+
+test('l’éligibilité annuelle impose une association étudiant/année unique et une clé étrangère réelle', () => {
+  const student = db
+    .prepare('INSERT INTO students (first_name, last_name, email) VALUES (?, ?, ?) RETURNING id')
+    .get('Alice', 'Dupont', 'alice@student.vinci.be') as { id: number };
+  db.prepare(
+    'INSERT INTO student_academic_year_eligibility (student_id, academic_year) VALUES (?, ?)',
+  ).run(student.id, '2026-2027');
+
+  expect(() => {
+    db.prepare(
+      'INSERT INTO student_academic_year_eligibility (student_id, academic_year) VALUES (?, ?)',
+    ).run(student.id, '2026-2027');
+  }).toThrow();
+  expect(() => {
+    db.prepare(
+      'INSERT INTO student_academic_year_eligibility (student_id, academic_year) VALUES (?, ?)',
+    ).run(999, '2026-2027');
+  }).toThrow();
 });
 
 test('le schéma frais ne conserve pas attachment_path et protège les métadonnées de pièce jointe', () => {

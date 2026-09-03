@@ -36,6 +36,16 @@ CREATE TABLE IF NOT EXISTS students (
   created_at     TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS student_academic_year_eligibility (
+  student_id    INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  academic_year TEXT    NOT NULL,
+  created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (student_id, academic_year)
+);
+
+CREATE INDEX IF NOT EXISTS idx_student_academic_year_eligibility_year
+  ON student_academic_year_eligibility(academic_year, student_id);
+
 -- validation_status/submitted_by_student_id/validated_at pilotent la file de
 -- moderation etudiante (voir docs/specs/2026-08-02-validation-offres-entreprises-contacts.md).
 -- Les index uniques normalises (email, nom+adresse) sont crees dans

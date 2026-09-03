@@ -1,14 +1,15 @@
 # Gestion des stages et des conventions
 
-Statut : sujet ouvert, plan de réimplémentation prêt.
+Statut : sujet ouvert, réimplémentation en cours ; task 001 terminée.
 
 Le besoin métier reste entièrement valide. Une première implémentation a été
 livrée puis annulée : elle présentait des défauts de conception sur le
 rattachement annuel et l'accès aux dossiers, ainsi qu'une couverture de tests
 inférieure à ce que la spec demandait. Le besoin, les décisions déjà prises et
-les corrections à apporter sont consolidés dans `spec.md`. L'exécution est
-découpée dans `plan.md` en deux axes liés mais distincts : constitution et
-gestion du dossier de stage, puis gestion de ses conventions.
+les corrections à apporter sont consolidés dans `spec.md`. L'exécution,
+commencée par l'import et l'éligibilité annuelle, est découpée dans `plan.md`
+en deux axes liés mais distincts : constitution et gestion du dossier de
+stage, puis gestion de ses conventions.
 
 Lecture minimale si ce sujet est repris :
 

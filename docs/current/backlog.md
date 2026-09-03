@@ -23,6 +23,14 @@ Questions à trancher avant toute spec :
 L'analyse d'origine est conservée dans
 `docs/history/analyses/company-departments.md`.
 
+## Suppression d'étudiants et de cohortes
+
+Statut : à étudier.
+
+Prévoir un mécanisme permettant au gestionnaire de supprimer un étudiant du
+référentiel ou de supprimer en masse une cohorte. Le traitement des données
+déjà liées aux étudiants devra être défini au moment d'engager ce sujet.
+
 ## Décisions produit et techniques à engager
 
 - Confirmer si `refusee`, déjà présent dans le code et le schéma SQL, devient

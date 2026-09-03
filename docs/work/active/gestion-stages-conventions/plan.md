@@ -2,7 +2,7 @@
 
 Date : 2026-09-02
 
-Statut : prêt à exécuter
+Statut : en cours — task 001 implémentée, prochaine tranche 002
 
 Emplacement : `docs/work/active/gestion-stages-conventions/plan.md` tant que le
 sujet est ouvert ; `docs/history/phases/` à la clôture.
@@ -214,14 +214,14 @@ réimport ne retire aucune association.
 
 **Travail :**
 
-* [ ] Ajouter `student_academic_year_eligibility` avec unicité
+* [x] Ajouter `student_academic_year_eligibility` avec unicité
   étudiant/année et clés étrangères.
-* [ ] Faire appartenir le schéma `{ academic_year, students }` à la feature
+* [x] Faire appartenir le schéma `{ academic_year, students }` à la feature
   `students`, sans dépendance vers `internships`.
-* [ ] Valider format, années consécutives et frontières du 14/15 septembre dans
+* [x] Valider format, années consécutives et frontières du 14/15 septembre dans
   les propriétaires partagés de l'année académique.
-* [ ] Rendre l'import additif, transactionnel et idempotent.
-* [ ] Empêcher toute requête frontend si le formulaire est invalide et afficher
+* [x] Rendre l'import additif, transactionnel et idempotent.
+* [x] Empêcher toute requête frontend si le formulaire est invalide et afficher
   une erreur utilisateur textuelle.
 
 **Verification:**
